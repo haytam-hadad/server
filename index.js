@@ -8,14 +8,11 @@ dotenv.config();
 const app = express();
 
 app.use(cors({
-  origin: (origin, callback) => {
-    if (/https:\/\/.*\.vercel\.app$/.test(origin) || !origin) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  }
+  origin: ['https://website-world-news.vercel.app', 'https://*.vercel.app'],
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 
 
 app.get('/api/news/top-headlines', async (req, res) => {
