@@ -7,7 +7,7 @@ import cors from 'cors';
 dotenv.config();
 const app = express();
 
-app.use(cors({ origin: 'https://website-world-news.vercel.app/' }));
+app.use(cors({ origin: 'https://*.vercel.app' }));
 
 app.get('/api/news/top-headlines', async (req, res) => {
   const { category, language } = req.query;
@@ -22,6 +22,7 @@ app.get('/api/news/top-headlines', async (req, res) => {
     console.error("Error fetching articles:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
+  console.log(res);
 });
 
 app.get('/api/news/search', async (req, res) => {
@@ -41,6 +42,7 @@ app.get('/api/news/search', async (req, res) => {
     console.error("Error fetching articles:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
+  console.log(res);
 });
 
 const PORT = process.env.PORT || 3000;
