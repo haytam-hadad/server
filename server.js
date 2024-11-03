@@ -6,6 +6,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 const app = express();
 
+const cors = require('cors');
+app.use(cors({ origin: 'https://website-world-news.vercel.app/' }));
+
+
 app.get('/api/news/top-headlines', async (req, res) => {
   const { category, language } = req.query;
   const apiKey = process.env.NEWS_API_KEY;
@@ -40,5 +44,5 @@ app.get('/api/news/search', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = 3000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
