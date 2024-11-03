@@ -7,7 +7,16 @@ import cors from 'cors';
 dotenv.config();
 const app = express();
 
-app.use(cors({ origin: 'https://*.vercel.app' }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (/https:\/\/.*\.vercel\.app$/.test(origin) || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+}));
+
 
 app.get('/api/news/top-headlines', async (req, res) => {
   const { category, language } = req.query;
