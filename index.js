@@ -36,7 +36,7 @@ app.get('/api/news/search', async (req, res) => {
   const apiKey = process.env.NEWS_API_KEY;
 
   const { q: searchQuery } = req.query;
-  const apiUrl = `${process.env.API_URL}/everything?q=${encodeURIComponent(searchQuery)}&language=${language}&apiKey=${apiKey}`;
+  const apiUrl = `${process.env.API_URL}/everything?qInTitle=${encodeURIComponent(searchQuery)}&language=${language}&sortBy=publishedAt&apiKey=${apiKey}`;
   try {
     const response = await fetch(apiUrl);
     if (!response.ok) {
