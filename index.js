@@ -15,8 +15,8 @@ app.use(cors({
 
 
 
-app.get('/api/news/top-headlines', async (req, res) => {
-  const { category, language } = req.query;
+app.get('/api/news-articles/top-news/:category/:language', async (req, res) => {
+  const { category, language } = req.params;
   const apiKey = process.env.NEWS_API_KEY;
   const apiUrl = `${process.env.API_URL}/top-headlines?country=us&category=${category}&language=${language}&apiKey=${apiKey}`;
   
@@ -31,12 +31,11 @@ app.get('/api/news/top-headlines', async (req, res) => {
   console.log(res);
 });
 
-app.get('/api/news/search', async (req, res) => {
-  const { search, language } = req.query;
+app.get('/api/news-articles/search/:searchvalue/:language', async (req, res) => {
+  const { searchvalue, language } = req.params;
   const apiKey = process.env.NEWS_API_KEY;
 
-  const { q: searchQuery } = req.query;
-  const apiUrl = `${process.env.API_URL}/everything?qInTitle=${encodeURIComponent(searchQuery)}&language=${language}&sortBy=publishedAt&apiKey=${apiKey}`;
+  const apiUrl = `${process.env.API_URL}/everything?qInTitle=${encodeURIComponent(searchvalue)}&language=${language}&sortBy=publishedAt&apiKey=${apiKey}`;
   try {
     const response = await fetch(apiUrl);
     if (!response.ok) {
