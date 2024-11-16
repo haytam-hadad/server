@@ -8,8 +8,8 @@ dotenv.config();
 const app = express();
 
 app.use(cors({
-  origin: ['https://website-world-news.vercel.app', 'https://*.vercel.app'],
-  methods: ['GET', 'POST'],
+  origin: ['https://world-news-alpha.vercel.app/', 'https://*.vercel.app'],
+  methods: ['GET', 'POST', 'PUT'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -20,6 +20,7 @@ app.get('/api/news-articles/top-news/:category/:language', async (req, res) => {
   const apiKey = process.env.NEWS_API_KEY;
   const apiUrl = `${process.env.API_URL}/top-headlines?country=us&category=${category}&language=${language}&apiKey=${apiKey}`;
   
+
   try {
     const response = await fetch(apiUrl);
     const data = await response.json();
@@ -35,7 +36,11 @@ app.get('/api/news-articles/search/:searchvalue/:language', async (req, res) => 
   const { searchvalue, language } = req.params;
   const apiKey = process.env.NEWS_API_KEY;
 
+
   const apiUrl = `${process.env.API_URL}/everything?qInTitle=${encodeURIComponent(searchvalue)}&language=${language}&sortBy=publishedAt&apiKey=${apiKey}`;
+  
+  
+  
   try {
     const response = await fetch(apiUrl);
     if (!response.ok) {
