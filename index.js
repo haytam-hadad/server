@@ -10,11 +10,14 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server);
 
-app.use(cors({
-  origin: ['https://world-news-alpha.vercel.app', 'https://*.vercel.app'],
-  methods: ['GET', 'POST', 'PUT'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// app.use(cors({
+//   origin: ['https://world-news-alpha.vercel.app', 'https://*.vercel.app'],
+//   methods: ['GET', 'POST', 'PUT'],
+//   allowedHeaders: ['Content-Type', 'Authorization']
+// }));
+
+app.use(cors({ origin: '*' }));
+
 
 // WebSocket setup
 io.on('connection', (socket) => {
