@@ -7,14 +7,11 @@ import cors from 'cors';
 dotenv.config();
 const app = express();
 
-// app.use(cors({
-//   origin: ['https://world-news-alpha.vercel.app/', 'https://*.vercel.app'],
-//   methods: ['GET', 'POST', 'PUT'],
-//   allowedHeaders: ['Content-Type', 'Authorization']
-// }));
-
-app.use(cors({ origin: '*' }));
-
+app.use(cors({
+  origin: ['https://world-news-alpha.vercel.app', 'https://*.vercel.app'],
+  methods: ['GET', 'POST', 'PUT'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 
 
