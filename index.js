@@ -8,8 +8,8 @@ dotenv.config();
 const app = express();
 
 app.use(cors({
-  origin: ['https://world-news-alpha.vercel.app', 'https://*.vercel.app'],
-  methods: ['GET', 'POST', 'PUT'],
+  origin: 'https://world-news-mu.vercel.app/',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
