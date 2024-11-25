@@ -1,59 +1,103 @@
 import express from 'express';
-import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 import cors from 'cors';
-
+import { query } from './db.js'; 
 
 dotenv.config();
 const app = express();
 
+// Set up CORS to allow requests from your frontend
 app.use(cors({
-  origin: 'https://world-news-mu.vercel.app/',
+  origin: '*', 
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 
+// Function to validate the category parameter
+function checkCategory(category) {
+  const allowedCategories = ['general','entertainment', 'health', 'science', 'sports', 'technology' , 'business'];
+  return allowedCategories.includes(category);
+}
 
-app.get('/api/news-articles/top-news/:category/:language', async (req, res) => {
-  const { category, language } = req.params;
-  const apiKey = process.env.NEWS_API_KEY;
-  const apiUrl = `${process.env.API_URL}/top-headlines?country=us&category=${category}&language=${language}&apiKey=${apiKey}`;
-  
+// Route to fetch articles
+app.get('/api/articles/:category?', async (req, res) => {
+  const { category } = req.params;
 
   try {
-    const response = await fetch(apiUrl);
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    console.error("Error fetching articles:", error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-  console.log(res);
-});
+    // Base query to get all articles
+    let queryText = `SELECT title , description , author , source_name , url , url_to_image , EXTRACT( HOUR FROM AGE(NOW() ,published_at)) AS timeAgo  , category FROM articles `;
+    const params = [];
 
-app.get('/api/news-articles/search/:searchvalue/:language', async (req, res) => {
-  const { searchvalue, language } = req.params;
-  const apiKey = process.env.NEWS_API_KEY;
-
-
-  const apiUrl = `${process.env.API_URL}/everything?qInTitle=${encodeURIComponent(searchvalue)}&language=${language}&sortBy=publishedAt&apiKey=${apiKey}`;
-  
-  
-  
-  try {
-    const response = await fetch(apiUrl);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    // If a valid category is provided, modify the query
+    if (checkCategory(category)) {
+      
+      params.push(category);
+      if (category === 'general') {
+        queryText += ' ORDER BY published_at DESC';
+        const result = await query(queryText); // Assuming `query` returns only rows
+        console.log(result);
+        res.json(result);
+      }else{
+        queryText += ' WHERE category = $1  ORDER BY published_at DESC';
+        const result = await query(queryText, params); // Assuming `query` returns only rows
+        console.log(result);
+        res.json(result);
+      }
+    }else {
+      throw new Error('Invalid category');
     }
-    const data = await response.json();
-    res.json(data);
-  } catch (error) {
-    console.error("Error fetching articles:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+
+  } catch (err) {
+    console.error('Database error:', err.message);
+    res.status(500).json({ error: `Server error. Please try again later. ${err}`, });
   }
-  console.log(res);
 });
 
-const PORT = process.env.PORT || 3000;
+
+
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+
+
+// app.get('/api/news-articles/top-news/:category/:language', async (req, res) => {
+//   const { category, language } = req.params;
+//   const apiKey = process.env.NEWS_API_KEY;
+//   const apiUrl = `${process.env.API_URL}/top-headlines?country=us&category=${category}&language=${language}&apiKey=${apiKey}`;
+  
+//   try {
+//     const response = await fetch(apiUrl);
+//     const data = await response.json();
+//     res.json(data);
+//   } catch (error) {
+//     console.error("Error fetching articles:", error);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+//   console.log(res);
+// });
+
+
+
+
+// app.get('/api/news-articles/search/:searchvalue/:language', async (req, res) => {
+//   const { searchvalue, language } = req.params;
+//   const apiKey = process.env.NEWS_API_KEY;
+
+//   const apiUrl = `${process.env.API_URL}/everything?qInTitle=${encodeURIComponent(searchvalue)}&language=${language}&sortBy=publishedAt&apiKey=${apiKey}`;
+  
+//   try {
+//     const response = await fetch(apiUrl);
+//     if (!response.ok) {
+//       throw new Error(`HTTP error! status: ${response.status}`);
+//     }
+//     const data = await response.json();
+//     res.json(data);
+//   } catch (error) {
+//     console.error("Error fetching articles:", error);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+//   console.log(res);
+// });
+
+
