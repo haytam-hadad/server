@@ -6,7 +6,6 @@ import { query } from './db.js';
 dotenv.config();
 const app = express();
 
-// Set up CORS to allow requests from your frontend
 app.use(cors({
   origin: '*', 
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
@@ -16,7 +15,7 @@ app.use(cors({
 
 // Function to validate the category parameter
 function checkCategory(category) {
-  const allowedCategories = ['general','entertainment', 'health', 'science', 'sports', 'technology' , 'business'];
+  const allowedCategories = ['all','entertainment', 'health', 'science', 'sports', 'technology' , 'business'];
   return allowedCategories.includes(category);
 }
 
@@ -33,7 +32,7 @@ app.get('/api/articles/:category?', async (req, res) => {
     if (checkCategory(category)) {
       
       params.push(category);
-      if (category === 'general') {
+      if (category === 'all') {
         queryText += ' ORDER BY published_at DESC';
         const result = await query(queryText); // Assuming `query` returns only rows
         console.log(result);
@@ -47,6 +46,28 @@ app.get('/api/articles/:category?', async (req, res) => {
     }else {
       throw new Error('Invalid category');
     }
+
+  } catch (err) {
+    console.error('Database error:', err.message);
+    res.status(500).json({ error: `Server error. Please try again later. ${err}`, });
+  }
+});
+
+
+
+app.get('/api/search/:q?', async (req, res) => {
+  const { q } = req.params;
+  let queryText = `SELECT title , description , author , source_name , url , url_to_image , EXTRACT( HOUR FROM AGE(NOW() ,published_at)) AS timeAgo  , category FROM articles WHERE title ILIKE $1
+                      UNION
+                    SELECT title , description , author , source_name , url , url_to_image , EXTRACT( HOUR FROM AGE(NOW() ,published_at)) AS timeAgo  , category FROM articles WHERE description ILIKE $1
+                      UNION
+                    SELECT title , description , author , source_name , url , url_to_image , EXTRACT( HOUR FROM AGE(NOW() ,published_at)) AS timeAgo  , category FROM articles WHERE source_name ILIKE $1;
+                    `;
+  const params = [`%${q}%`];                  
+  try {
+    const result = await query(queryText, params);
+    console.log(result);
+    res.json(result);
 
   } catch (err) {
     console.error('Database error:', err.message);
