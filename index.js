@@ -25,7 +25,7 @@ app.get('/api/articles/:category?', async (req, res) => {
 
   try {
     // Base query to get all articles
-    let queryText = `SELECT title , description , author , source_name , url , url_to_image , EXTRACT( HOUR FROM AGE(NOW() ,published_at)) AS timeAgo  , category FROM articles `;
+    let queryText = `SELECT title , description , author , source_name , url , media_type , EXTRACT( HOUR FROM AGE(NOW() ,published_at)) AS timeAgo  , category FROM articles `;
     const params = [];
 
     // If a valid category is provided, modify the query
@@ -57,11 +57,11 @@ app.get('/api/articles/:category?', async (req, res) => {
 
 app.get('/api/search/:q?', async (req, res) => {
   const { q } = req.params;
-  let queryText = `SELECT title , description , author , source_name , url , url_to_image , EXTRACT( HOUR FROM AGE(NOW() ,published_at)) AS timeAgo  , category FROM articles WHERE title ILIKE $1
+  let queryText = `SELECT title , description , author , source_name , url , media_type , EXTRACT( HOUR FROM AGE(NOW() ,published_at)) AS timeAgo  , category FROM articles WHERE title ILIKE $1
                       UNION
-                    SELECT title , description , author , source_name , url , url_to_image , EXTRACT( HOUR FROM AGE(NOW() ,published_at)) AS timeAgo  , category FROM articles WHERE description ILIKE $1
+                    SELECT title , description , author , source_name , url , media_type , EXTRACT( HOUR FROM AGE(NOW() ,published_at)) AS timeAgo  , category FROM articles WHERE description ILIKE $1
                       UNION
-                    SELECT title , description , author , source_name , url , url_to_image , EXTRACT( HOUR FROM AGE(NOW() ,published_at)) AS timeAgo  , category FROM articles WHERE source_name ILIKE $1;
+                    SELECT title , description , author , source_name , url , media_type , EXTRACT( HOUR FROM AGE(NOW() ,published_at)) AS timeAgo  , category FROM articles WHERE source_name ILIKE $1;
                     `;
   const params = [`%${q}%`];                  
   try {

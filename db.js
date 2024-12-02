@@ -1,20 +1,21 @@
 import pkg from 'pg';
+import dotenv from 'dotenv';
+
+// Load environment variables from the .env file
+dotenv.config();
+
+// Destructure Pool from pg package
 const { Pool } = pkg;
 
-
-// const pool = new Pool({
-//   user: 'postgres',     
-//   host: 'localhost',    
-//   database: 'pfe',     
-//   password: '',      
-//   port: 5432,          
-// });
-
+// Initialize the connection pool with the connection string
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false, // This is typically needed for cloud-hosted databases like Neon
+  },
 });
 
-
+// Function to query the database
 export const query = async (text, params) => {
   try {
     const result = await pool.query(text, params);
