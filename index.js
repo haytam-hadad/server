@@ -28,21 +28,22 @@ app.get('/api/articles/:category?', async (req, res) => {
     let queryText = `SELECT title , description , author , source_name , url , media_type , EXTRACT( HOUR FROM AGE(NOW() ,published_at)) AS timeAgo  , category FROM articles `;
     const params = [];
 
-    // If a valid category is provided, modify the query
+
     if (checkCategory(category)) {
       
       params.push(category);
       if (category === 'all') {
         queryText += ' ORDER BY published_at DESC';
-        const result = await query(queryText); // Assuming `query` returns only rows
-        console.log(result);
+        const result = await query(queryText);
         res.json(result);
+        console.log(result);
       }else{
         queryText += ' WHERE category = $1  ORDER BY published_at DESC';
-        const result = await query(queryText, params); // Assuming `query` returns only rows
-        console.log(result);
+        const result = await query(queryText, params);
         res.json(result);
+        console.log(result);
       }
+
     }else {
       throw new Error('Invalid category');
     }

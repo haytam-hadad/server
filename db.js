@@ -11,7 +11,7 @@ const { Pool } = pkg;
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false, // This is typically needed for cloud-hosted databases like Neon
+    rejectUnauthorized: false,
   },
 });
 
