@@ -13,7 +13,6 @@ app.use(cors({
 }));
 
 
-// Function to validate the category parameter
 function checkCategory(category) {
   const allowedCategories = ['all','entertainment', 'health', 'science', 'sports', 'technology' , 'business'];
   return allowedCategories.includes(category);
