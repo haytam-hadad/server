@@ -3,14 +3,19 @@ import routes from "./routes/index.mjs";
 import cookieParser from "cookie-parser";
 import session from "express-session";
 import passport from "passport";
+import dotenv from "dotenv";
 import mongoose from "mongoose";
 import "./strategies/local-strategy.mjs";
 import { userarray } from "./utils/constants.mjs";
 import MongoStore from "connect-mongo";
 
+dotenv.config();
+
+
+
 const app = express();
 
-mongoose.connect("mongodb+srv://haytamhadad:9gnNMG5WgxSIMSg8@cluster0.i1r9j.mongodb.net/pfe", {
+mongoose.connect(process.env.MONGODB_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 })
@@ -76,3 +81,5 @@ app.post('/api/auth/logout',(request,response)=>{
         response.sendStatus(200);
     });
 });
+
+
