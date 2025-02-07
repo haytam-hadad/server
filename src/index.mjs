@@ -3,19 +3,16 @@ import routes from "./routes/index.mjs";
 import cookieParser from "cookie-parser";
 import session from "express-session";
 import passport from "passport";
-import dotenv from "dotenv";
 import mongoose from "mongoose";
 import "./strategies/local-strategy.mjs";
-import { userarray } from "./utils/constants.mjs";
 import MongoStore from "connect-mongo";
-
-dotenv.config();
-
-
+import crypto from "crypto";
+import nodemailer from "nodemailer";
+import { User } from "./mongoose/schemas/user.mjs";
 
 const app = express();
 
-mongoose.connect(process.env.MONGODB_URI, {
+mongoose.connect("mongodb+srv://haytamhadad:9gnNMG5WgxSIMSg8@cluster0.i1r9j.mongodb.net/pfe", {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 })
@@ -82,4 +79,90 @@ app.post('/api/auth/logout',(request,response)=>{
     });
 });
 
+app.post('/api/forgotpwd', async (req, res) => {
+  const { email } = req.body;
+  
+  try {
+    // Find the user by email
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "No account with that email address exists." });
+    }
 
+    // Generate a random OTP (6 digits)
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit OTP
+
+    // Save OTP and expiration time (e.g., 10 minutes)
+    user.resetOtp = otp;
+    user.resetOtpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes from now
+
+    await user.save();
+
+    // Configure nodemailer transport (adjust for your email service)
+    const transporter = nodemailer.createTransport({
+      service: 'Gmail', // or another service
+      auth: {
+        user: 'alaeloukili2005@gmail.com',
+        pass: '2005'
+      },
+      tls: {
+        rejectUnauthorized: false, // Allows self-signed certificates
+      }
+    });
+
+    // Send the OTP via email
+    const mailOptions = {
+      to: user.email,
+      from: 'alaeloukili2005@gmail.com',
+      subject: 'Password Reset OTP',
+      text: `You are receiving this because you (or someone else) have requested a reset of the password for your account.\n\n
+      Your OTP is: ${otp}\n\n
+      This OTP will expire in 10 minutes.\n\n
+      If you did not request this, please ignore this email.`
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return res.status(200).json({ message: 'An OTP has been sent to your email.' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Example: POST /api/reset-password
+app.post('/api/resetpwd', async (req, res) => {
+    const { email, otp, newPassword } = req.body; // Expect email, OTP, and new password from the client
+  
+    try {
+      // Find user by email and check if the OTP is valid and not expired
+      const user = await User.findOne({
+        email,
+        resetOtp: otp,
+        resetOtpExpires: { $gt: Date.now() } // Check if OTP has expired
+      });
+  
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired OTP." });
+      }
+  
+      // Generate a new password (you can also use a password generator)
+      const newGeneratedPassword = Math.random().toString(36).slice(-8); // Example new random password
+  
+      // Hash the new password
+      user.password = hashPassword(newGeneratedPassword);
+  
+      // Clear the OTP and expiration fields
+      user.resetOtp = undefined;
+      user.resetOtpExpires = undefined;
+  
+      await user.save();
+  
+      // Send the new password back to the user (send via email or show it directly in the response)
+      return res.status(200).json({ message: 'Your password has been reset successfully.', newPassword: newGeneratedPassword });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+});
+  

@@ -11,31 +11,38 @@ const router = Router();
 router.get(
     '/api/users',
     query("filter")
-    .isString()
-    .notEmpty()
-    .withMessage("filter must not be empty")
-    .isLength({min: 3 ,max: 10})
-    .withMessage("filter must be between 3 and 10 characters"),
-    (request,response)=>{
-        console.log(request.session.id);
-        request.sessionStore.get(request.session.id, (err,sessionData) =>{
-            if(err){
-                console.log(err);
-                throw err;
-            }
-            console.log(sessionData);
-        });
+        .optional()  // Makes the "filter" parameter optional
+        .isString()
+        .withMessage("filter must be a string")
+        .isLength({ min: 3, max: 10 })
+        .withMessage("filter must be between 3 and 10 characters"),
+    async (request, response) => {
         const result = validationResult(request);
-        console.log(result);
-        const { 
-            query: { filter , value },
-        } = request;    
-        if(filter && value)return response.send(userarray.filter((user)=> user[filter].includes(value)));
-        return response.send(userarray);
+        if (!result.isEmpty()) {
+            return response.status(400).send(result.array());
+        }
+
+        const { filter, value } = request.query;
+
+        try {
+            let users;
+            if (filter && value) {
+                // Use dynamic filtering based on query params
+                users = await User.find({ [filter]: new RegExp(value, "i") }); // "i" for case-insensitive
+            } else {
+                // Fetch all users
+                users = await User.find({});
+            }
+
+            return response.status(200).json(users);
+        } catch (error) {
+            console.error(error);
+            return response.status(500).send({ error: "Internal server error" });
+        }
     }
 );
 
-router.post('/api/users', checkSchema(createUserValidationSchema),async (request,response)=>{
+router.post('/api/signup', checkSchema(createUserValidationSchema),async (request,response)=>{
     const result = validationResult(request);
     if(!result.isEmpty())return response.status(400).send(result.array());
     const data = matchedData(request);

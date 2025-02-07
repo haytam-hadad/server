@@ -1,4 +1,5 @@
 import { userarray } from "./constants.mjs";
+
 export const resolveIndexUserId = (request,response,next) =>{
     const {
         body,
