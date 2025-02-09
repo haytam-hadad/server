@@ -46,14 +46,6 @@ app.post("/api/auth",passport.authenticate("local"),(request,response)=>{
     return response.status(200).send(request.user);
 });
 
-//starting the server :
-
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
-
 // "/api" : means the base route
 
 app.get('/', (request, response) => {
@@ -165,4 +157,14 @@ app.post('/api/resetpwd', async (req, res) => {
       return res.status(500).json({ message: "Internal server error" });
     }
 });
+
+
+//starting the server :
+
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
+
   
