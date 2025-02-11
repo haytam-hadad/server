@@ -3,7 +3,7 @@ import {query,validationResult,body,matchedData, checkSchema} from 'express-vali
 import { userarray } from "../utils/constants.mjs";
 import { resolveIndexUserId } from "../utils/middlewares.mjs";
 import { User } from "../mongoose/schemas/user.mjs";
-import { createUserValidationSchema } from "../utils/validationSchemas.mjs";
+import { createUserValidationSchema , updateUserValidationSchema} from "../utils/validationSchemas.mjs";
 import { hashPassword } from "../utils/helpers.mjs";
 
 const router = Router();
@@ -37,7 +37,7 @@ router.get(
             return response.status(200).json(users);
         } catch (error) {
             console.error(error);
-            return response.status(500).send({ error: "Internal server error" });
+            return response.status(500).send({ error: "something wrong happened , please try again :)" });
         }
     }
 );
@@ -58,6 +58,52 @@ router.post('/api/signup', checkSchema(createUserValidationSchema),async (reques
         return response.sendStatus(400);
     }
 });
+
+router.get('/api/userprofile', (request, response) => {
+    if (request.user) {
+        const { id, username, email } = request.user;
+      return response.status(200).json({ id, username, email }); 
+    } else {
+      return response.status(401).send({ message: "unAuthentificated User" });
+    }
+});
+
+router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidationSchema), async (request, response) => {
+    if (request.user) {
+        const { username, email } = request.body;
+        
+        const result = validationResult(request);
+        if (!result.isEmpty()) {
+            return response.status(400).send(result.array());
+        }
+        
+        const data = matchedData(request);
+
+        const updateFields = {};
+
+        if (data.username) updateFields.username = data.username;
+        if (data.email) updateFields.email = data.email;
+
+        try {
+            const updatedUser = await User.findByIdAndUpdate(
+                request.user.id, 
+                updateFields,
+                { new: true }  // Return the updated document
+            );
+
+            if (!updatedUser) {
+                return response.status(404).send({ message: 'User not found' });
+            }
+            return response.status(200).send({ message: 'User Information Updated!' });
+        } catch (error) {
+            console.error(error);
+            return response.status(500).send({ message: 'Error updating user information' });
+        }
+    } else {
+        return response.status(401).send({ message: 'Unauthenticated User' });
+    }
+});
+
 
 router.get('/api/users/:id',resolveIndexUserId,(request,response)=>{
     const { finduserIndex } = request;

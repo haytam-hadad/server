@@ -4,15 +4,21 @@ import cookieParser from "cookie-parser";
 import session from "express-session";
 import passport from "passport";
 import mongoose from "mongoose";
+import { hashPassword, comparePassword } from "./utils/helpers.mjs";
 import "./strategies/local-strategy.mjs";
 import MongoStore from "connect-mongo";
-import crypto from "crypto";
+import dotenv from 'dotenv';
 import nodemailer from "nodemailer";
 import { User } from "./mongoose/schemas/user.mjs";
 
+
+dotenv.config();
 const app = express();
 
-mongoose.connect("mongodb+srv://haytamhadad:9gnNMG5WgxSIMSg8@cluster0.i1r9j.mongodb.net/pfe", {
+const mongoUrl = process.env.ATLAS_URI;
+const secretpwd = process.env.SESSION_SECRET;
+
+mongoose.connect(mongoUrl, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 })
@@ -24,15 +30,15 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(
     session({
-        secret: 'Swordart12',
+        secret: secretpwd,
         saveUninitialized: false,
         resave: false,
         cookie: {
-            maxAge: 60000 * 60,
+          maxAge: 60000 * 60,
         },
         store: MongoStore.create({
-            client: mongoose.connection.getClient()
-        })
+          client: mongoose.connection.getClient(),
+        }),        
     })
 );
 
@@ -48,7 +54,10 @@ app.post("/api/auth",passport.authenticate("local"),(request,response)=>{
 
 //starting the server :
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
+const useremail = process.env.EMAIL_USER;
+const userpassword = process.env.EMAIL_PASS;
+
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
@@ -102,8 +111,8 @@ app.post('/api/forgotpwd', async (req, res) => {
     const transporter = nodemailer.createTransport({
       service: 'Gmail', // or another service
       auth: {
-        user: 'alaeloukili2005@gmail.com',
-        pass: '2005'
+        user: useremail,
+        pass: userpassword
       },
       tls: {
         rejectUnauthorized: false, // Allows self-signed certificates
@@ -113,7 +122,7 @@ app.post('/api/forgotpwd', async (req, res) => {
     // Send the OTP via email
     const mailOptions = {
       to: user.email,
-      from: 'alaeloukili2005@gmail.com',
+      from: useremail,
       subject: 'Password Reset OTP',
       text: `You are receiving this because you (or someone else) have requested a reset of the password for your account.\n\n
       Your OTP is: ${otp}\n\n
@@ -132,7 +141,7 @@ app.post('/api/forgotpwd', async (req, res) => {
 
 // Example: POST /api/reset-password
 app.post('/api/resetpwd', async (req, res) => {
-    const { email, otp, newPassword } = req.body; // Expect email, OTP, and new password from the client
+    const { email, otp, newPassword } = req.body;
   
     try {
       // Find user by email and check if the OTP is valid and not expired
@@ -146,11 +155,8 @@ app.post('/api/resetpwd', async (req, res) => {
         return res.status(400).json({ message: "Invalid or expired OTP." });
       }
   
-      // Generate a new password (you can also use a password generator)
-      const newGeneratedPassword = Math.random().toString(36).slice(-8); // Example new random password
-  
       // Hash the new password
-      user.password = hashPassword(newGeneratedPassword);
+      user.password = hashPassword(newPassword);
   
       // Clear the OTP and expiration fields
       user.resetOtp = undefined;
@@ -159,7 +165,7 @@ app.post('/api/resetpwd', async (req, res) => {
       await user.save();
   
       // Send the new password back to the user (send via email or show it directly in the response)
-      return res.status(200).json({ message: 'Your password has been reset successfully.', newPassword: newGeneratedPassword });
+      return res.status(200).json({ message: 'Your password has been reset successfully.'});
     } catch (error) {
       console.error(error);
       return res.status(500).json({ message: "Internal server error" });

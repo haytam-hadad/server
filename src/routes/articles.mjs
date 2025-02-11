@@ -60,4 +60,17 @@ router.get('/api/news/search/:query', async (req, res) => {
   }
 });
 
+router.get('/api/news/:articleId', async (req, res) => {
+  try {
+    const { articleId } = req.params;
+    const article = await Article.findById(articleId);
+    if (!article) {
+      return res.status(404).json({ message: 'Article not found.' });
+    }
+    res.json(article);
+  } catch (error) {
+    res.status(500).json({ error: 'Something went Wrong' });
+  }
+});
+
 export default router;
