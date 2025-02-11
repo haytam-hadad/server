@@ -34,7 +34,7 @@ router.get('/api/news/category/:category', async (req, res) => {
   }
 });
 
-//Search articles by title or author
+// 🔍 Search articles by title, author, or content
 router.get('/api/news/search/:query', async (req, res) => {
   try {
     const { query } = req.params;
@@ -45,7 +45,8 @@ router.get('/api/news/search/:query', async (req, res) => {
     const articles = await Article.find({
       $or: [
         { title: { $regex: query, $options: 'i' } },
-        { author: { $regex: query, $options: 'i' } }
+        { author: { $regex: query, $options: 'i' } },
+        { content: { $regex: query, $options: 'i' } } // Added content search
       ]
     });
 
