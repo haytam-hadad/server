@@ -3,7 +3,7 @@ import { Article } from "../mongoose/schemas/article.mjs"; // Ensure the path to
 
 const router = Router();
 
-// 📰 Fetch latest news (sorted by publishedAt)
+//Fetch latest news (sorted by publishedAt)
 router.get('/api/news/latest', async (req, res) => {
   try {
     const latestNews = await Article.find().sort({ publishedAt: -1 }).limit(10);
@@ -17,7 +17,7 @@ router.get('/api/news/latest', async (req, res) => {
   }
 });
 
-// 🏷 Fetch articles by category
+// Fetch articles by category
 router.get('/api/news/category/:category', async (req, res) => {
   try {
     const { category } = req.params;
@@ -34,7 +34,7 @@ router.get('/api/news/category/:category', async (req, res) => {
   }
 });
 
-// 🔍 Search articles by title or author
+//Search articles by title or author
 router.get('/api/news/search/:query', async (req, res) => {
   try {
     const { query } = req.params;
@@ -60,6 +60,8 @@ router.get('/api/news/search/:query', async (req, res) => {
   }
 });
 
+
+//fetch article by Id
 router.get('/api/news/:articleId', async (req, res) => {
   try {
     const { articleId } = req.params;

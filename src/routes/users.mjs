@@ -1,7 +1,5 @@
 import { Router } from "express";
 import {query,validationResult,body,matchedData, checkSchema} from 'express-validator';
-import { userarray } from "../utils/constants.mjs";
-import { resolveIndexUserId } from "../utils/middlewares.mjs";
 import { User } from "../mongoose/schemas/user.mjs";
 import { createUserValidationSchema , updateUserValidationSchema} from "../utils/validationSchemas.mjs";
 import { hashPassword } from "../utils/helpers.mjs";
@@ -102,32 +100,6 @@ router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidati
     } else {
         return response.status(401).send({ message: 'Unauthenticated User' });
     }
-});
-
-
-router.get('/api/users/:id',resolveIndexUserId,(request,response)=>{
-    const { finduserIndex } = request;
-    const finduser = userarray[finduserIndex];
-    if(!finduser) return response.sendStatus(404);
-    return response.send(finduser);
-});
-
-router.put('/api/users/:id',resolveIndexUserId,(request,response)=>{
-    const {body,finduserIndex} = request;
-    userarray[finduserIndex] = { id:userarray[finduserIndex].id,...body};
-    return response.sendStatus(200);
-});
-
-router.patch('/api/users/:id',resolveIndexUserId,(request,response)=>{
-    const {body,finduserIndex} = request;
-    userarray[finduserIndex] = { ...userarray[finduserIndex],...body};
-    return response.sendStatus(200);
-});
-
-router.delete('/api/users/:id',resolveIndexUserId,(request,response)=>{
-    const {finduserIndex} = request;
-    userarray.splice(finduserIndex,1);
-    return response.sendStatus(200);
 });
 
 export default router;
