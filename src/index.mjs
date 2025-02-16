@@ -10,10 +10,13 @@ import MongoStore from "connect-mongo";
 import dotenv from 'dotenv';
 import nodemailer from "nodemailer";
 import { User } from "./mongoose/schemas/user.mjs";
+import cors from "cors";
 
 
 dotenv.config();
 const app = express();
+app.use(cors());
+
 
 const mongoUrl = process.env.ATLAS_URI;
 const secretpwd = process.env.SESSION_SECRET;
