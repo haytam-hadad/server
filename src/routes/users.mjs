@@ -7,38 +7,47 @@ import { hashPassword } from "../utils/helpers.mjs";
 const router = Router();
 
 router.get(
-    '/api/users',
+    "/api/users",
     query("filter")
-        .optional()  // Makes the "filter" parameter optional
+        .optional()
         .isString()
-        .withMessage("filter must be a string")
+        .withMessage("Filter must be a string")
         .isLength({ min: 3, max: 10 })
-        .withMessage("filter must be between 3 and 10 characters"),
+        .withMessage("Filter must be between 3 and 10 characters"),
+    query("value")
+        .optional()
+        .isString()
+        .withMessage("Value must be a string")
+        .notEmpty()
+        .withMessage("Value cannot be empty"),
     async (request, response) => {
         const result = validationResult(request);
         if (!result.isEmpty()) {
-            return response.status(400).send(result.array());
+            return response.status(400).json(result.array());
         }
 
         const { filter, value } = request.query;
 
         try {
-            let users;
-            if (filter && value) {
-                // Use dynamic filtering based on query params
-                users = await User.find({ [filter]: new RegExp(value, "i") }); // "i" for case-insensitive
-            } else {
-                // Fetch all users
-                users = await User.find({});
+            // If no filter or value is provided, return an empty array
+            if (!filter || !value) {
+                return response.status(200).json([]);
             }
+
+            // Fetch users with role "user" and apply filter
+            const users = await User.find({ 
+                role: "user", 
+                [filter]: new RegExp(value, "i") 
+            });
 
             return response.status(200).json(users);
         } catch (error) {
             console.error(error);
-            return response.status(500).send({ error: "something wrong happened , please try again :)" });
+            return response.status(500).json({ error: "Something went wrong, please try again :)" });
         }
     }
 );
+
 
 router.post('/api/signup', checkSchema(createUserValidationSchema),async (request,response)=>{
     const result = validationResult(request);
@@ -57,14 +66,23 @@ router.post('/api/signup', checkSchema(createUserValidationSchema),async (reques
     }
 });
 
-router.get('/api/userprofile', (request, response) => {
-    if (request.user) {
-        const { id, username, email } = request.user;
-      return response.status(200).json({ id, username, email }); 
-    } else {
-      return response.status(401).send({ message: "unAuthentificated User" });
+router.get('/api/userprofile/:id', async (request, response) => {
+    if (!request.user) {
+        return response.status(401).json({ message: "Unauthenticated User" });
+    }
+    try {
+        const user = await User.findById(request.params.id).select("id username email createdAt");
+
+        if (!user) {
+            return response.status(404).json({ message: "User not found" });
+        }
+        return response.status(200).json(user);
+    } catch (error) {
+        console.error(error);
+        return response.status(500).json({ message: "Something went wrong" });
     }
 });
+
 
 router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidationSchema), async (request, response) => {
     if (request.user) {
