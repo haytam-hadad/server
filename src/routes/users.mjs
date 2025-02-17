@@ -66,22 +66,24 @@ router.post('/api/signup', checkSchema(createUserValidationSchema),async (reques
     }
 });
 
-router.get('/api/userprofile/:id', async (request, response) => {
-    if (!request.user) {
-        return response.status(401).json({ message: "Unauthenticated User" });
-    }
-    try {
-        const user = await User.findById(request.params.id).select("id username email createdAt");
+router.get(
+    '/api/userprofile',
+    query("username").isString().withMessage("Username must be a string"),
+    async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json(errors.array());
 
-        if (!user) {
-            return response.status(404).json({ message: "User not found" });
+        try {
+            const { username } = req.query;
+            const user = await User.findOne({ username }).select("id username email createdAt");
+            if (!user) return res.status(404).json({ message: "User not found" });
+            res.status(200).json(user);
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ message: "Something went wrong" });
         }
-        return response.status(200).json(user);
-    } catch (error) {
-        console.error(error);
-        return response.status(500).json({ message: "Something went wrong" });
     }
-});
+);
 
 
 router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidationSchema), async (request, response) => {

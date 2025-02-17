@@ -34,6 +34,26 @@ router.get('/api/news/category/:category', async (req, res) => {
   }
 });
 
+router.get('/api/articles/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    if (!username) {
+      return res.status(400).json({ message: "Username is required" });
+    }
+
+    const articles = await Article.find({ author: { $regex: new RegExp(`^${username}$`, 'i') } });
+    if (articles.length === 0) {
+      return res.status(404).json({ message: `No articles found for username: ${username}` });
+    }
+
+    res.status(200).json(articles);
+  } catch (error) {
+    console.error("Error fetching articles by username:", error);
+    res.status(500).json({ message: "Something went wrong" });
+  }
+});
+
+
 // 🔍 Search articles by title, author, or content
 router.get('/api/news/search/:query', async (req, res) => {
   try {
