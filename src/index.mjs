@@ -10,7 +10,10 @@ import MongoStore from "connect-mongo";
 import dotenv from 'dotenv';
 import nodemailer from "nodemailer";
 import { User } from "./mongoose/schemas/user.mjs";
+import { Googleuser } from "./mongoose/schemas/googleuser.mjs";
+import "./strategies/passport-config.mjs";
 import cors from "cors";
+import "./strategies/googleAuth.mjs";
 
 
 dotenv.config();
@@ -72,6 +75,7 @@ app.get('/', (request, response) => {
     console.log(request.session.id);
     request.session.visited = true;
     response.cookie("hello","world",{ maxAge: 600000000000});
+    console.log(request.user);
     response.status(201).send({msg: "hello!"});
 });
 
@@ -174,4 +178,15 @@ app.post('/api/resetpwd', async (req, res) => {
       return res.status(500).json({ message: "Internal server error" });
     }
 });
+
+app.get("/api/auth/google",
+  passport.authenticate("google", { scope: ["profile", "email"] })
+);
+
+app.get('/api/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: 'http://localhost:3000/' }),
+  function(req, res) {
+    // Successful authentication, redirect home.
+    res.redirect('/api/auth/status');
+  });
   
