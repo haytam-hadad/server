@@ -183,10 +183,14 @@ app.get("/api/auth/google",
   passport.authenticate("google", { scope: ["profile", "email"] })
 );
 
-app.get('/api/auth/google/callback', 
-  passport.authenticate('google', { failureRedirect: 'http://localhost:3000/' }),
-  function(req, res) {
-    // Successful authentication, redirect home.
-    res.redirect('/api/auth/status');
-  });
+app.get('/api/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: process.env.CLIENT_URL || 'http://localhost:3000/login' }),
+  (req, res) => {
+    if (!req.user) {
+      res.redirect('http://localhost:3000/login');
+    }
+    // Redirect to frontend with session or token handling
+    res.redirect('http://localhost:3000');
+  }
+);
   

@@ -27,6 +27,7 @@ passport.use(
                       email,
                       isGoogleUser: true,
                   });
+                  console.log(profile);
                   await user.save();
               }
 
