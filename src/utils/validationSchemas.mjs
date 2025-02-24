@@ -20,6 +20,14 @@ export const createUserValidationSchema = {
             errorMessage: "Password must be at least 6 characters long",
         },
     },
+    birthday: {
+        in: ["body"],
+        isDate: true,
+        errorMessage: "Invalid birthday",
+        notEmpty: {
+            errorMessage: "birthday is required",
+        },
+    }
 };
 
 export const updateUserValidationSchema = {
