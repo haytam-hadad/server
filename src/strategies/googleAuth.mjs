@@ -22,10 +22,12 @@ passport.use(
 
               if (!user) {
                   user = new Googleuser({
-                      usergoogleId: profile.id,
-                      username: profile.displayName,
-                      email,
-                      isGoogleUser: true,
+                    usergoogleId: profile.id,
+                    username: profile.displayName,
+                    email,
+                    isGoogleUser: true,         
+                    picture: profile.photos?.[0]?.value,
+                    emailVerified: profile._json?.email_verified || false,                      
                   });
                   console.log(profile);
                   await user.save();

@@ -74,9 +74,9 @@ app.listen(PORT, () => {
 app.get('/', (request, response) => {
     console.log(request.session.id);
     request.session.visited = true;
-    response.cookie("hello","world",{ maxAge: 600000000000});
+    response.cookie("AuthUser","true",{ maxAge: 600000000000});
     console.log(request.user);
-    response.status(201).send({msg: "hello!"});
+    response.status(201).send({msg: "authentificated user!"});
 });
 
 
@@ -180,8 +180,9 @@ app.post('/api/resetpwd', async (req, res) => {
 });
 
 app.get("/api/auth/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
+  passport.authenticate("google", { scope: ["profile", "email"] }),(request,response)=>{
+  return response.status(200).send(request.user);
+});
 
 app.get('/api/auth/google/callback',
   passport.authenticate('google', { failureRedirect: process.env.CLIENT_URL || 'http://localhost:3000/login' }),
@@ -190,7 +191,7 @@ app.get('/api/auth/google/callback',
       res.redirect('http://localhost:3000/login');
     }
     // Redirect to frontend with session or token handling
-    res.redirect('http://localhost:3000');
+    res.redirect('http://localhost:3000/');
   }
 );
   
