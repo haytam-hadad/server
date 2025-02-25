@@ -20,15 +20,69 @@ export const createUserValidationSchema = {
             errorMessage: "Password must be at least 6 characters long",
         },
     },
+    bio: {
+        in: ["body"],
+        optional: true,
+        isString: true,
+        trim: true,
+    },
+    phone: {
+        in: ["body"],
+        optional: true,
+        isMobilePhone: {
+            options: ["any"],
+            errorMessage: "Invalid phone number",
+        },
+    },
+    website: {
+        in: ["body"],
+        optional: true,
+        isURL: {
+            errorMessage: "Invalid website URL",
+        },
+    },
+    gender: {
+        in: ["body"],
+        optional: true,
+        isString: true,
+        trim: true,
+    },
+    country: {
+        in: ["body"],
+        optional: true,
+        isString: true,
+        trim: true,
+    },
+    city: {
+        in: ["body"],
+        optional: true,
+        isString: true,
+        trim: true,
+    },
+    zipCode: {
+        in: ["body"],
+        optional: true,
+        isPostalCode: {
+            options: "any",
+            errorMessage: "Invalid zip code",
+        },
+    },
     birthday: {
         in: ["body"],
-        isDate: true,
-        errorMessage: "Invalid birthday",
-        notEmpty: {
-            errorMessage: "birthday is required",
+        optional: true, // Birthday is not required
+        isISO8601: {
+            errorMessage: "Invalid date format (must be YYYY-MM-DD)",
         },
-    }
+    },
+    profilePicture: {
+        in: ["body"],
+        optional: true,
+        isURL: {
+            errorMessage: "Invalid profile picture URL",
+        },
+    },
 };
+
 
 export const updateUserValidationSchema = {
     username: {
