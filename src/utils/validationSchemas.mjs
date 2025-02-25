@@ -3,9 +3,13 @@ export const createUserValidationSchema = {
         in: ["body"],
         isString: true,
         trim: true,
-        notEmpty: {
-            errorMessage: "Username is required",
-        },
+        notEmpty: { errorMessage: "Username is required" },
+    },
+    displayname: {
+        in: ["body"],
+        optional: true,
+        isString: true,
+        trim: true,
     },
     email: {
         in: ["body"],
@@ -29,17 +33,12 @@ export const createUserValidationSchema = {
     phone: {
         in: ["body"],
         optional: true,
-        isMobilePhone: {
-            options: ["any"],
-            errorMessage: "Invalid phone number",
-        },
+        isMobilePhone: { options: ["any"], errorMessage: "Invalid phone number" },
     },
     website: {
         in: ["body"],
         optional: true,
-        isURL: {
-            errorMessage: "Invalid website URL",
-        },
+        isURL: { errorMessage: "Invalid website URL" },
     },
     gender: {
         in: ["body"],
@@ -62,26 +61,31 @@ export const createUserValidationSchema = {
     zipCode: {
         in: ["body"],
         optional: true,
-        isPostalCode: {
-            options: "any",
-            errorMessage: "Invalid zip code",
-        },
+        isPostalCode: { options: ["any"], errorMessage: "Invalid zip code" },
     },
-    birthday: {
+    birthdate: {
         in: ["body"],
-        optional: true, // Birthday is not required
-        isISO8601: {
-            errorMessage: "Invalid date format (must be YYYY-MM-DD)",
+        custom: {
+            options: (value) => {
+                if (!value) throw new Error("Birthdate is required");
+
+                // Allow both Date objects and ISO 8601 strings
+                if (!(value instanceof Date) && isNaN(Date.parse(value))) {
+                    throw new Error("Invalid date format (must be YYYY-MM-DD or a valid Date object)");
+                }
+
+                return true;
+            },
         },
+        toDate: true, 
     },
     profilePicture: {
         in: ["body"],
         optional: true,
-        isURL: {
-            errorMessage: "Invalid profile picture URL",
-        },
+        isURL: { errorMessage: "Invalid profile picture URL" },
     },
 };
+
 
 
 export const updateUserValidationSchema = {

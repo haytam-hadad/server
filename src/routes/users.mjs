@@ -50,6 +50,7 @@ router.get(
 
 
 router.post('/api/signup', checkSchema(createUserValidationSchema),async (request,response)=>{
+    console.log("Incoming request body:", request.body);
     const result = validationResult(request);
     if(!result.isEmpty())return response.status(400).send(result.array());
     const data = matchedData(request);

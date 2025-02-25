@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true, trim: true },
+    displayname: { type: String, default: "", trim: true },
     email: { type: String, required: true, unique: true, lowercase: true },
     password: { type: String, required: true },
     role: { type: String, enum: ["user", "admin"], default: "user" },  
@@ -13,7 +14,7 @@ const UserSchema = new mongoose.Schema({
     country: { type: String, default: "" },
     city: { type: String, default: "" },
     zipCode: { type: String, default: "" },
-    birthday: { type: Date },
+    birthdate: { type: Date },
     profilePicture: { type: String, default: "" }, 
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
