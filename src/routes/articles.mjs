@@ -1,5 +1,7 @@
 import { Router } from "express";
-import { Article } from "../mongoose/schemas/article.mjs"; // Ensure the path to Article is correct
+import { Article } from "../mongoose/schemas/article.mjs";
+import {validationResult,matchedData, checkSchema} from 'express-validator';
+import { createArticleValidationSchema } from "../utils/validationSchemas.mjs";
 
 const router = Router();
 
@@ -95,5 +97,40 @@ router.get('/api/news/:articleId', async (req, res) => {
     res.status(500).json({ error: 'Something went Wrong' });
   }
 });
+
+
+router.post('/api/news/newpost', checkSchema(createArticleValidationSchema), async (request, response) => {
+  // First, validate the incoming request data
+  const result = validationResult(request);
+  if (!result.isEmpty()) {
+    return response.status(400).send(result.array());
+  }
+
+  if (request.user) {
+    console.log("Incoming request body:", request.body);
+
+    // Extract the validated data
+    const data = matchedData(request);
+    data.author = request.user._id; 
+
+    console.log(data); 
+
+    
+    const newArticle = new Article(data);
+    try {
+      const savedArticle = await newArticle.save();
+      return response.status(201).send({
+        message: "Article created successfully",
+        articleId: savedArticle._id
+      });
+    } catch (error) {
+      console.log(error);
+      return response.status(500).send({ message: "Something went wrong. Please try again." });
+    }
+  } else {
+    return response.status(401).send("Unauthorized");
+  }
+});
+
 
 export default router;

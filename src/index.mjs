@@ -44,6 +44,7 @@ app.use(
         },
         store: MongoStore.create({
           client: mongoose.connection.getClient(),
+          ttl: 60 * 60, // auto delete of session after expiration
         }),        
     })
 );
@@ -73,10 +74,7 @@ app.listen(PORT, () => {
 
 app.get('/', (request, response) => {
     console.log(request.session.id);
-    request.session.visited = true;
-    response.cookie("AuthUser","true",{ maxAge: 600000000000});
     console.log(request.user);
-    response.status(201).send({msg: "authentificated user!"});
 });
 
 

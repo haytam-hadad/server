@@ -1,3 +1,5 @@
+import { body } from "express-validator";
+
 export const createUserValidationSchema = {
     username: {
         in: ["body"],
@@ -123,3 +125,45 @@ export const updateUserValidationSchema = {
         },
     },
 };
+
+export const createArticleValidationSchema = {
+    title: {
+      in: ["body"],
+      isString: true,
+      notEmpty: { errorMessage: "Title is required" },
+      isLength: { options: { min: 15 }, errorMessage: "Title must be at least 15 characters long" },
+    },
+    content: {
+      in: ["body"],
+      isString: true,
+      notEmpty: { errorMessage: "Content is required" },
+      isLength: { options: { min: 10 }, errorMessage: "Content must be at least 10 characters long" },
+    },
+    category: {
+      in: ["body"],
+      isString: true,
+      notEmpty: { errorMessage: "Category is required" },
+    },
+    imageUrl: {
+      in: ["body"],
+      optional: true,
+      isURL: { errorMessage: "Invalid image URL" },
+    },
+    source: {
+      in: ["body"],
+      optional: true,
+      isObject: { errorMessage: "Source must be an object with type and url" },
+      custom: {
+        options: (value) => {
+          if (value && !value.type) {
+            throw new Error("Source type is required");
+          }
+          if (value && !value.url) {
+            throw new Error("Source URL is required");
+          }
+          return true;
+        }
+      },
+    }
+  };
+  

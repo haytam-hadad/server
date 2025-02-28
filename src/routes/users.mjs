@@ -67,16 +67,18 @@ router.post('/api/signup', checkSchema(createUserValidationSchema),async (reques
     }
 });
 
-router.get(
-    '/api/userprofile',
-    query("username").isString().withMessage("Username must be a string"),
+router.get("/api/userprofile",
+    query("username").isString().trim().withMessage("Username must be a string"),
     async (req, res) => {
         const errors = validationResult(req);
-        if (!errors.isEmpty()) return res.status(400).json(errors.array());
-
+        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
         try {
             const { username } = req.query;
-            const user = await User.findOne({ username }).select("id username email createdAt");
+            const user = await User.findOne({ username }).select(
+                "-password -resetOtp -resetOtpExpires -__v -role -isActive -updatedAt"
+            );
+            console.log("user profile informations");
+            console.log(user);
             if (!user) return res.status(404).json({ message: "User not found" });
             res.status(200).json(user);
         } catch (err) {
