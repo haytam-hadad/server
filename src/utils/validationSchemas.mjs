@@ -126,6 +126,7 @@ export const updateUserValidationSchema = {
     },
 };
 
+
 export const createArticleValidationSchema = {
     title: {
       in: ["body"],
@@ -139,15 +140,49 @@ export const createArticleValidationSchema = {
       notEmpty: { errorMessage: "Content is required" },
       isLength: { options: { min: 10 }, errorMessage: "Content must be at least 10 characters long" },
     },
+    authorusername: {
+      in: ["body"],
+      isString: true,
+      notEmpty: { errorMessage: "Author username is required" },
+    },
+    authordisplayname: {
+      in: ["body"],
+      isString: true,
+      notEmpty: { errorMessage: "Author display name is required" },
+    },
     category: {
       in: ["body"],
       isString: true,
       notEmpty: { errorMessage: "Category is required" },
     },
+    publishedAt: {
+      in: ["body"],
+      optional: true,
+      isISO8601: { errorMessage: "Invalid date format for publishedAt" },
+    },
+    views: {
+      in: ["body"],
+      optional: true,
+      isInt: { options: { min: 0 }, errorMessage: "Views must be a non-negative integer" },
+    },
+    likes: {
+      in: ["body"],
+      optional: true,
+      isInt: { options: { min: 0 }, errorMessage: "Likes must be a non-negative integer" },
+    },
     imageUrl: {
       in: ["body"],
       optional: true,
-      isURL: { errorMessage: "Invalid image URL" },
+      isURL: { errorMessage: "Invalid article picture URL" },
+    },
+    status: {
+      in: ["body"],
+      isString: true,
+      notEmpty: { errorMessage: "Status is required" },
+      isIn: {
+        options: [["on-going", "approved", "rejected"]],
+        errorMessage: "Status must be one of: 'on-going', 'approved', or 'rejected'",
+      },
     },
     source: {
       in: ["body"],
@@ -155,15 +190,17 @@ export const createArticleValidationSchema = {
       isObject: { errorMessage: "Source must be an object with type and url" },
       custom: {
         options: (value) => {
-          if (value && !value.type) {
+          if (!value.type) {
             throw new Error("Source type is required");
           }
-          if (value && !value.url) {
+          if (!["video", "article", "book", "other"].includes(value.type)) {
+            throw new Error("Source type must be 'video', 'article', 'book', or 'other'");
+          }
+          if (!value.url) {
             throw new Error("Source URL is required");
           }
           return true;
-        }
+        },
       },
-    }
-  };
-  
+    },
+};

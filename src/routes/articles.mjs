@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Article } from "../mongoose/schemas/article.mjs";
 import {validationResult,matchedData, checkSchema} from 'express-validator';
 import { createArticleValidationSchema } from "../utils/validationSchemas.mjs";
+import mongoose from "mongoose";
 
 const router = Router();
 
@@ -43,7 +44,14 @@ router.get('/api/articles/:username', async (req, res) => {
       return res.status(400).json({ message: "Username is required" });
     }
 
-    const articles = await Article.find({ author: { $regex: new RegExp(`^${username}$`, 'i') } });
+    console.log("Fetching articles for username:", username);
+
+    const articles = await Article.find({ 
+      authorusername: { $regex: new RegExp(`^${username}$`, 'i') } 
+    });
+
+    console.log("Articles found:", articles.length);
+
     if (articles.length === 0) {
       return res.status(404).json({ message: `No articles found for username: ${username}` });
     }
@@ -54,6 +62,7 @@ router.get('/api/articles/:username', async (req, res) => {
     res.status(500).json({ message: "Something went wrong" });
   }
 });
+
 
 
 // 🔍 Search articles by title, author, or content
@@ -84,53 +93,61 @@ router.get('/api/news/search/:query', async (req, res) => {
 });
 
 
-//fetch article by Id
 router.get('/api/news/:articleId', async (req, res) => {
   try {
     const { articleId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(articleId)) {
+      return res.status(400).json({ message: 'Invalid article ID format.' });
+    }
     const article = await Article.findById(articleId);
     if (!article) {
       return res.status(404).json({ message: 'Article not found.' });
     }
     res.json(article);
   } catch (error) {
-    res.status(500).json({ error: 'Something went Wrong' });
+    console.error('Error fetching article by ID:', error);
+    res.status(500).json({ error: 'Something went wrong.' });
   }
 });
+
 
 
 router.post('/api/news/newpost', checkSchema(createArticleValidationSchema), async (request, response) => {
-  // First, validate the incoming request data
+  // Validate request data
   const result = validationResult(request);
   if (!result.isEmpty()) {
-    return response.status(400).send(result.array());
+    return response.status(400).json({ errors: result.array() });
   }
 
-  if (request.user) {
-    console.log("Incoming request body:", request.body);
+  if (!request.user) {
+    return response.status(401).json({ message: "Unauthorized" });
+  }
 
-    // Extract the validated data
-    const data = matchedData(request);
-    data.author = request.user._id; 
+  console.log("Incoming request body:", request.body);
 
-    console.log(data); 
+  // Extract validated data
+  const data = matchedData(request);
 
-    
+  // Fix: Assign username properly
+  data.authorusername = request.user.username; 
+  data.authordisplayname = request.user.displayname; // Ensure display name is stored too
+
+  console.log("Processed article data:", data);
+
+  try {
     const newArticle = new Article(data);
-    try {
-      const savedArticle = await newArticle.save();
-      return response.status(201).send({
-        message: "Article created successfully",
-        articleId: savedArticle._id
-      });
-    } catch (error) {
-      console.log(error);
-      return response.status(500).send({ message: "Something went wrong. Please try again." });
-    }
-  } else {
-    return response.status(401).send("Unauthorized");
+    const savedArticle = await newArticle.save();
+
+    return response.status(201).json({
+      message: "Article created successfully",
+      articleId: savedArticle._id
+    });
+  } catch (error) {
+    console.error("Error saving article:", error);
+    return response.status(500).json({ message: "Something went wrong. Please try again." });
   }
 });
+
 
 
 export default router;

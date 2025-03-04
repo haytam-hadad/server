@@ -18,7 +18,11 @@ import "./strategies/googleAuth.mjs";
 
 dotenv.config();
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  credentials: true,
+}));
+
 
 
 const mongoUrl = process.env.ATLAS_URI;
@@ -34,20 +38,21 @@ mongoose.connect(mongoUrl, {
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(
-    session({
-        secret: secretpwd,
-        saveUninitialized: false,
-        resave: false,
-        cookie: {
-          maxAge: 60000 * 60,
-        },
-        store: MongoStore.create({
-          client: mongoose.connection.getClient(),
-          ttl: 60 * 60, // auto delete of session after expiration
-        }),        
-    })
-);
+app.use(session({
+  secret: secretpwd,
+  saveUninitialized: false,
+  resave: false,
+  cookie: {
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
+      httpOnly: true, 
+      secure: false,  // ✅ Secure cookies in production
+      sameSite: "lax"
+  },
+  store: MongoStore.create({
+      client: mongoose.connection.getClient(),
+  }),        
+}));
+
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -73,8 +78,9 @@ app.listen(PORT, () => {
 // "/api" : means the base route
 
 app.get('/', (request, response) => {
-    console.log(request.session.id);
-    console.log(request.user);
+  request.session.visited = true;
+  console.log(request.session.id);
+  console.log(request.user);
 });
 
 
@@ -85,13 +91,22 @@ app.get('/api/auth/status',(request,response)=>{
     return request.user ? response.send(request.user) : response.sendStatus(401);
 });
 
-app.post('/api/auth/logout',(request,response)=>{
-    if(!request.user) return response.sendStatus(401);
-    request.logOut((err) => {
-        if(err) return response.sendStatus(400);
-        response.sendStatus(200);
-    });
+app.post('/api/auth/logout', (req, res) => {
+  if (!req.user) return res.sendStatus(401);
+
+  req.logout((err) => {
+      if (err) return res.sendStatus(500);
+
+      req.session.destroy((err) => { 
+          if (err) return res.status(500).json({ message: "Failed to log out" });
+
+          res.clearCookie("connect.sid", { path: "/" }); // Ensure cookie is removed
+          res.status(200).json({ message: "Logged out successfully" });
+      });
+  });
 });
+
+
 
 app.post('/api/forgotpwd', async (req, res) => {
   const { email } = req.body;
