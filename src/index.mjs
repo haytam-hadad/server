@@ -83,6 +83,13 @@ app.get('/', (request, response) => {
   console.log(request.user);
 });
 
+app.get("/api/auth/user", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.json({ user: req.user });
+  } else {
+    res.json({ user: null });
+  }
+});
 
 app.get('/api/auth/status',(request,response)=>{
     console.log("inside the /auth/status endpoint ");

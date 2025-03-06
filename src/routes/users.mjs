@@ -86,101 +86,61 @@ router.post('/api/signup', checkSchema(createUserValidationSchema), async (reque
 });
 
 
-// for private profile  :require the user to be authentificated , only the user can see his profile
-router.get("/api/user/profile", async (req, res) => {
-    try {
-        if (!req.user) {
-            return res.status(401).json({ message: "Unauthorized" });
+
+router.get("/api/userprofile",
+    query("username").isString().trim().withMessage("Username must be a string"),
+    async (req, res) => {
+        try {
+            const { username } = req.query;
+            const user = await User.findOne({ username }).select(
+                "-password -resetOtp -resetOtpExpires -__v -role -isActive -updatedAt"
+            );
+            console.log("user profile informations");
+            console.log(user);
+            if (!user) return res.status(404).json({ message: "User not found" });
+            res.status(200).json(user);
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ message: "Something went wrong" });
         }
-
-        const user = await User.findById(req.user.id).select("-password -__v");
-
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        res.status(200).json(user);
-    } catch (err) {
-        console.error("Error fetching private profile:", err);
-        res.status(500).json({ message: "Something went wrong" });
     }
-});
-
-//for public profile : everyone can see the profile
-router.get("/api/users/:username", async (req, res) => {
-    try {
-        const { username } = req.params;
-        
-        // Find user but exclude sensitive fields
-        const user = await User.findOne({ username }).select(
-            "-password -resetOtp -resetOtpExpires -__v -role -isActive -updatedAt"
-        );
-
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        res.status(200).json(user);
-    } catch (err) {
-        console.error("Error fetching user profile:", err);
-        res.status(500).json({ message: "Something went wrong" });
-    }
-});
-
+);
 
 
 router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidationSchema), async (request, response) => {
-    if (!request.user) {
+    if (request.user) {
+        const { username, email } = request.body;
+        
+        const result = validationResult(request);
+        if (!result.isEmpty()) {
+            return response.status(400).send(result.array());
+        }
+        
+        const data = matchedData(request);
+
+        const updateFields = {};
+
+        if (data.username) updateFields.username = data.username;
+        if (data.email) updateFields.email = data.email;
+
+        try {
+            const updatedUser = await User.findByIdAndUpdate(
+                request.user.id, 
+                updateFields,
+                { new: true }  // Return the updated document
+            );
+
+            if (!updatedUser) {
+                return response.status(404).send({ message: 'User not found' });
+            }
+            return response.status(200).send({ message: 'User Information Updated!' });
+        } catch (error) {
+            console.error(error);
+            return response.status(500).send({ message: 'Error updating user information' });
+        }
+    } else {
         return response.status(401).send({ message: 'Unauthenticated User' });
     }
-
-    const result = validationResult(request);
-    if (!result.isEmpty()) {
-        return response.status(400).send(result.array());
-    }
-
-    const data = matchedData(request);
-    const updateFields = {};
-
-    if (data.username) {
-        // Check if username is taken
-        const existingUser = await User.findOne({ username: data.username });
-        if (existingUser && existingUser._id.toString() !== request.user.id) {
-            return response.status(400).json({ message: "Username is already taken" });
-        }
-        updateFields.username = data.username;
-    }
-
-    if (data.email) {
-        // Check if email is taken
-        const existingUser = await User.findOne({ email: data.email });
-        if (existingUser && existingUser._id.toString() !== request.user.id) {
-            return response.status(400).json({ message: "Email is already in use" });
-        }
-        updateFields.email = data.email;
-    }
-
-    if (data.password) {
-        updateFields.password = hashPassword(data.password);
-    }
-
-    try {
-        const updatedUser = await User.findByIdAndUpdate(
-            request.user.id, 
-            updateFields,
-            { new: true }  // Return the updated document
-        );
-
-        if (!updatedUser) {
-            return response.status(404).send({ message: 'User not found' });
-        }
-
-        return response.status(200).send({ message: 'User Information Updated!' });
-    } catch (error) {
-        console.error(error);
-        return response.status(500).send({ message: 'Error updating user information' });
-    }
 });
-
 
 export default router;
