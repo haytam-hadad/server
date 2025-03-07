@@ -142,13 +142,13 @@ export const createArticleValidationSchema = {
     },
     authorusername: {
       in: ["body"],
+      optional: true, // Make optional since we set it from session
       isString: true,
-      notEmpty: { errorMessage: "Author username is required" },
     },
     authordisplayname: {
       in: ["body"],
+      optional: true, // Make optional since we set it from session
       isString: true,
-      notEmpty: { errorMessage: "Author display name is required" },
     },
     category: {
       in: ["body"],
