@@ -69,26 +69,30 @@ router.get('/api/articles/:username', async (req, res) => {
 router.get('/api/news/search/:query', async (req, res) => {
   try {
     const { query } = req.params;
+    console.log("Search query received:", query);
+    
     if (!query) {
       return res.status(400).json({ error: 'Search query is required.' });
     }
 
+    // Update the search fields to match your schema
     const articles = await Article.find({
       $or: [
         { title: { $regex: query, $options: 'i' } },
-        { author: { $regex: query, $options: 'i' } },
-        { content: { $regex: query, $options: 'i' } } // Added content search
+        { authorusername: { $regex: query, $options: 'i' } }, // Changed from author to authorusername
+        { authordisplayname: { $regex: query, $options: 'i' } }, // Added authordisplayname
+        { content: { $regex: query, $options: 'i' } },
+        { category: { $regex: query, $options: 'i' } } // Added category search
       ]
     });
 
-    if (articles.length === 0) {
-      return res.status(404).json({ message: `No articles found for query: "${query}".` });
-    }
+    console.log(`Found ${articles.length} articles for query "${query}"`);
 
-    res.json(articles);
+    // Return empty array instead of 404 for no results
+    return res.status(200).json(articles);
   } catch (err) {
     console.error('Error searching for articles:', err);
-    res.status(500).json({ error: 'Error searching for articles.' });
+    return res.status(500).json({ error: 'Error searching for articles.' });
   }
 });
 
