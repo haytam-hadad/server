@@ -109,19 +109,33 @@ router.get("/api/userprofile",
 
 router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidationSchema), async (request, response) => {
     if (request.user) {
-        const { username, email } = request.body;
+        console.log("Received profile update request:", request.body);
         
         const result = validationResult(request);
         if (!result.isEmpty()) {
-            return response.status(400).send(result.array());
+            console.log("Validation errors:", result.array());
+            return response.status(400).json({ errors: result.array() });
         }
         
         const data = matchedData(request);
-
+        console.log("Validated data:", data);
+        
         const updateFields = {};
 
+        // Add all fields from the validated data to updateFields
         if (data.username) updateFields.username = data.username;
+        if (data.displayname !== undefined) updateFields.displayname = data.displayname;
         if (data.email) updateFields.email = data.email;
+        if (data.phone !== undefined) updateFields.phone = data.phone;
+        if (data.website !== undefined) updateFields.website = data.website;
+        if (data.bio !== undefined) updateFields.bio = data.bio;
+        if (data.birthdate) updateFields.birthdate = data.birthdate;
+        if (data.gender !== undefined) updateFields.gender = data.gender;
+        if (data.country !== undefined) updateFields.country = data.country;
+        if (data.city !== undefined) updateFields.city = data.city;
+        if (data.zipCode !== undefined) updateFields.zipCode = data.zipCode;
+
+        console.log("Fields to update:", updateFields);
 
         try {
             const updatedUser = await User.findByIdAndUpdate(
@@ -131,15 +145,26 @@ router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidati
             );
 
             if (!updatedUser) {
-                return response.status(404).send({ message: 'User not found' });
+                console.log("User not found in database");
+                return response.status(404).json({ message: 'User not found' });
             }
-            return response.status(200).send({ message: 'User Information Updated!' });
+            
+            console.log("User updated successfully:", updatedUser.username);
+            return response.status(200).json({ 
+                message: 'User Information Updated!',
+                user: {
+                    username: updatedUser.username,
+                    displayname: updatedUser.displayname,
+                    email: updatedUser.email
+                }
+            });
         } catch (error) {
-            console.error(error);
-            return response.status(500).send({ message: 'Error updating user information' });
+            console.error("Error updating user:", error);
+            return response.status(500).json({ message: 'Error updating user information' });
         }
     } else {
-        return response.status(401).send({ message: 'Unauthenticated User' });
+        console.log("Unauthenticated user attempted to update profile");
+        return response.status(401).json({ message: 'Unauthenticated User' });
     }
 });
 

@@ -90,40 +90,105 @@ export const createUserValidationSchema = {
 
 
 
+// validationSchemas.mjs - Updated updateUserValidationSchema
 export const updateUserValidationSchema = {
-    username: {
-        in: ["body"],
-        isString: true,
-        trim: true,
-        optional: { options: { nullable: true } },  // Allow empty or missing values
-        isLength: {
-            options: { min: 6 },
-            errorMessage: "Username must be at least 6 characters long",
-        },
-        custom: {
-            options: (value) => {
-                if (value === "") {
-                    throw new Error("Username cannot be empty");
-                }
-                return true;
-            },
-        },
+  username: {
+    in: ["body"],
+    isString: true,
+    trim: true,
+    optional: { options: { nullable: true } },
+    isLength: {
+      options: { min: 3 }, // Changed from 6 to 3 to match your frontend validation
+      errorMessage: "Username must be at least 3 characters long",
     },
-    email: {
-        in: ["body"],
-        isEmail: true,
-        normalizeEmail: true,
-        optional: { options: { nullable: true } },  // Allow empty or missing values
-        errorMessage: "Invalid email",
-        custom: {
-            options: (value) => {
-                if (value === "") {
-                    throw new Error("Email cannot be empty");
-                }
-                return true;
-            },
-        },
+    custom: {
+      options: (value) => {
+        if (value === "") {
+          throw new Error("Username cannot be empty");
+        }
+        return true;
+      },
     },
+  },
+  displayname: {
+    in: ["body"],
+    isString: true,
+    trim: true,
+    optional: { options: { nullable: true } },
+  },
+  email: {
+    in: ["body"],
+    isEmail: true,
+    normalizeEmail: true,
+    optional: { options: { nullable: true } },
+    errorMessage: "Invalid email",
+    custom: {
+      options: (value) => {
+        if (value === "") {
+          throw new Error("Email cannot be empty");
+        }
+        return true;
+      },
+    },
+  },
+  phone: {
+    in: ["body"],
+    optional: { options: { nullable: true } },
+    isMobilePhone: { 
+      options: ["any"], 
+      errorMessage: "Invalid phone number",
+      if: (value) => value && value.length > 0
+    },
+  },
+  website: {
+    in: ["body"],
+    optional: { options: { nullable: true } },
+    isURL: { 
+      errorMessage: "Invalid website URL",
+      if: (value) => value && value.length > 0
+    },
+  },
+  bio: {
+    in: ["body"],
+    optional: { options: { nullable: true } },
+    isString: true,
+    trim: true,
+  },
+  birthdate: {
+    in: ["body"],
+    optional: { options: { nullable: true } },
+    isISO8601: { 
+      errorMessage: "Invalid date format for birthdate",
+      if: (value) => value && value.length > 0
+    },
+  },
+  gender: {
+    in: ["body"],
+    optional: { options: { nullable: true } },
+    isString: true,
+    trim: true,
+  },
+  country: {
+    in: ["body"],
+    optional: { options: { nullable: true } },
+    isString: true,
+    trim: true,
+  },
+  city: {
+    in: ["body"],
+    optional: { options: { nullable: true } },
+    isString: true,
+    trim: true,
+  },
+  zipCode: {
+    in: ["body"],
+    optional: { options: { nullable: true } },
+    isPostalCode: { 
+      options: ["any"], 
+      errorMessage: "Invalid zip code",
+      if: (value) => value && value.length > 0
+    },
+  },
 };
 
 
