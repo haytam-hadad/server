@@ -11,11 +11,10 @@ const articleSchema = new mongoose.Schema({
   likes: { type: Number, default: 0 },
   imageUrl: { type: String, default: "" },
   status: { type: String, enum: ["on-going", "approved", "rejected"], default: "on-going" },
-  source: {
-    kind: { type: String, enum: ["video", "article", "book", "other"], default: "other" },
-    url: { type: String, default: "" }
-  }
+  sources: [{
+    key: { type: String, enum: ["url", "video", "article", "book", "other"], default: "url" },
+    value: { type: String, default: "" }
+  }]
 }, { timestamps: true });
 
-export const Article = mongoose.model("article",articleSchema);
-
+export const Article = mongoose.model("article", articleSchema);

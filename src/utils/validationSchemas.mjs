@@ -193,79 +193,54 @@ export const updateUserValidationSchema = {
 
 
 export const createArticleValidationSchema = {
-    title: {
-      in: ["body"],
-      isString: true,
-      notEmpty: { errorMessage: "Title is required" },
-      isLength: { options: { min: 15 }, errorMessage: "Title must be at least 15 characters long" },
-    },
-    content: {
-      in: ["body"],
-      isString: true,
-      notEmpty: { errorMessage: "Content is required" },
-      isLength: { options: { min: 10 }, errorMessage: "Content must be at least 10 characters long" },
-    },
-    authorusername: {
-      in: ["body"],
-      optional: true, // Make optional since we set it from session
-      isString: true,
-    },
-    authordisplayname: {
-      in: ["body"],
-      optional: true, // Make optional since we set it from session
-      isString: true,
-    },
-    category: {
-      in: ["body"],
-      isString: true,
-      notEmpty: { errorMessage: "Category is required" },
-    },
-    publishedAt: {
-      in: ["body"],
-      optional: true,
-      isISO8601: { errorMessage: "Invalid date format for publishedAt" },
-    },
-    views: {
-      in: ["body"],
-      optional: true,
-      isInt: { options: { min: 0 }, errorMessage: "Views must be a non-negative integer" },
-    },
-    likes: {
-      in: ["body"],
-      optional: true,
-      isInt: { options: { min: 0 }, errorMessage: "Likes must be a non-negative integer" },
-    },
-    imageUrl: {
-      in: ["body"],
-      optional: true,
-      isURL: { errorMessage: "Invalid article picture URL" },
-    },
-    status: {
-      in: ["body"],
-      isString: true,
-      notEmpty: { errorMessage: "Status is required" },
-      isIn: {
-        options: [["on-going", "approved", "rejected"]],
-        errorMessage: "Status must be one of: 'on-going', 'approved', or 'rejected'",
-      },
-    },
-    source: {
-      in: ["body"],
-      optional: true,
-      isObject: { errorMessage: "Source must be an object with type and url" },
-      custom: {
-        options: (value) => {
-          if (!value.type) {
-            throw new Error("Source type is required");
-          }
-          if (!["video", "article", "book", "other"].includes(value.type)) {
-            throw new Error("Source type must be 'video', 'article', 'book', or 'other'");
-          }
-          if (!value.url) {
-            throw new Error("Source URL is required");
-          }
-          return true;
-        },
-      },
-    },
+  title: {
+    in: ['body'],
+    isString: true,
+    notEmpty: true,
+    errorMessage: 'Title is required'
+  },
+  content: {
+    in: ['body'],
+    isString: true,
+    notEmpty: true,
+    errorMessage: 'Content is required'
+  },
+  category: {
+    in: ['body'],
+    isString: true,
+    notEmpty: true,
+    errorMessage: 'Category is required'
+  },
+  imageUrl: {
+    in: ['body'],
+    isString: true,
+    optional: true
+  },
+  status: {
+    in: ['body'],
+    isString: true,
+    optional: true,
+    isIn: {
+      options: [['on-going', 'approved', 'rejected']],
+      errorMessage: 'Invalid status value'
+    }
+  },
+  sources: {
+    optional: true,
+    isArray: true,
+    errorMessage: 'Sources must be an array'
+  },
+  'sources.*.key': {
+    optional: true,
+    isString: true,
+    isIn: {
+      options: [['url', 'video', 'article', 'book', 'other']],
+      errorMessage: 'Invalid source kind'
+    }
+  },
+  'sources.*.value': {
+    optional: true,
+    isString: true
+  }
 };
+

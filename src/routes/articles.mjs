@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { Article } from "../mongoose/schemas/article.mjs";
-import {validationResult,matchedData, checkSchema} from 'express-validator';
+import { validationResult, matchedData, checkSchema } from 'express-validator';
 import { createArticleValidationSchema } from "../utils/validationSchemas.mjs";
 import mongoose from "mongoose";
+import { requireAuth } from "../middleware/auth.mjs";
 
 const router = Router();
 
@@ -63,8 +64,6 @@ router.get('/api/articles/:username', async (req, res) => {
   }
 });
 
-
-
 // 🔍 Search articles by title, author, or content
 router.get('/api/news/search/:query', async (req, res) => {
   try {
@@ -96,7 +95,6 @@ router.get('/api/news/search/:query', async (req, res) => {
   }
 });
 
-
 router.get('/api/news/:articleId', async (req, res) => {
   try {
     const { articleId } = req.params;
@@ -114,32 +112,36 @@ router.get('/api/news/:articleId', async (req, res) => {
   }
 });
 
-
-
-router.post('/api/news/newpost', checkSchema(createArticleValidationSchema), async (request, response) => {
+// Update the POST route to handle the new sources array
+router.post('/api/news/newpost', requireAuth, checkSchema(createArticleValidationSchema), async (request, response) => {
   // Validate request data
   const result = validationResult(request);
   if (!result.isEmpty()) {
     return response.status(400).json({ errors: result.array() });
   }
 
-  if (!request.user) {
-    return response.status(401).json({ message: "Unauthorized" });
-  }
-
-  console.log("Incoming request body:", request.body);
-
-  // Extract validated data
-  const data = matchedData(request);
-
-  // Fix: Assign username properly
-  data.authorusername = request.user.username; 
-  data.authordisplayname = request.user.displayname; // Ensure display name is stored too
-
-  console.log("Processed article data:", data);
-
   try {
-    const newArticle = new Article(data);
+    // Extract validated data
+    const validatedData = matchedData(request);
+    console.log("Validated data:", validatedData);
+    
+    // Create article data object with validated data
+    const articleData = {
+      ...validatedData,
+      authorusername: request.user.username,
+      authordisplayname: request.user.displayname,
+      status: validatedData.status || "on-going"
+    };
+
+    // Ensure sources is an array
+    if (!articleData.sources) {
+      articleData.sources = [];
+    }
+
+    console.log("Processed article data:", articleData);
+
+    // Create and save the article
+    const newArticle = new Article(articleData);
     const savedArticle = await newArticle.save();
 
     return response.status(201).json({
@@ -148,10 +150,12 @@ router.post('/api/news/newpost', checkSchema(createArticleValidationSchema), asy
     });
   } catch (error) {
     console.error("Error saving article:", error);
-    return response.status(500).json({ message: "Something went wrong. Please try again." });
+    return response.status(500).json({ 
+      message: "Something went wrong. Please try again.",
+      error: error.message
+    });
   }
 });
 
-
-
 export default router;
+
