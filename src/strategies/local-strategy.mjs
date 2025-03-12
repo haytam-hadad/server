@@ -6,10 +6,13 @@ import "./passport-config.mjs";
 
 passport.use(
     new LocalStrategy(async(username, password, done)=>{
-        console.log(`Username: ${username}`);
-        console.log(`Password: ${password}`);
         try {
-            const findUser = await User.findOne({username});
+            const findUser = await User.findOne({
+                $or: [
+                    { username: username },
+                    { email: username }
+                ]
+            });
             if(!findUser) throw new Error("user not found");
             if(!comparePassword(password,findUser.password)) throw new Error("bad credentials");
             done(null,findUser);
