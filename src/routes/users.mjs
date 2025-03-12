@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {query,validationResult,body,matchedData, checkSchema} from 'express-validator';
 import { User } from "../mongoose/schemas/user.mjs";
+import { Googleuser } from "../mongoose/schemas/googleuser.mjs";
 import { createUserValidationSchema , updateUserValidationSchema} from "../utils/validationSchemas.mjs";
 import { hashPassword } from "../utils/helpers.mjs";
 
@@ -87,16 +88,34 @@ router.post('/api/signup', checkSchema(createUserValidationSchema), async (reque
 
 
 
+// Modified userprofile route to handle both regular and Google users
 router.get("/api/userprofile",
     query("username").isString().trim().withMessage("Username must be a string"),
     async (req, res) => {
         try {
             const { username } = req.query;
-            const user = await User.findOne({ username }).select(
+            
+            // First try to find in regular users
+            let user = await User.findOne({ username }).select(
                 "-password -resetOtp -resetOtpExpires -__v -role -isActive -updatedAt"
             );
-            console.log("user profile informations");
+            
+            // If not found, try to find in Google users
+            if (!user) {
+                user = await Googleuser.findOne({ username }).select(
+                    "-__v -isActive -updatedAt"
+                );
+                
+                // If found in Google users, add displayname if it doesn't exist
+                if (user && !user.displayname) {
+                    user = user.toObject(); // Convert to plain object to add properties
+                    user.displayname = user.username;
+                }
+            }
+            
+            console.log("user profile information");
             console.log(user);
+            
             if (!user) return res.status(404).json({ message: "User not found" });
             res.status(200).json(user);
         } catch (err) {
@@ -106,7 +125,7 @@ router.get("/api/userprofile",
     }
 );
 
-
+// Modified profile update route to handle both regular and Google users
 router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidationSchema), async (request, response) => {
     if (request.user) {
         console.log("Received profile update request:", request.body);
@@ -138,11 +157,25 @@ router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidati
         console.log("Fields to update:", updateFields);
 
         try {
-            const updatedUser = await User.findByIdAndUpdate(
-                request.user.id, 
-                updateFields,
-                { new: true }  // Return the updated document
-            );
+            // Check if the user is a Google user
+            const isGoogleUser = request.user.isGoogleUser;
+            let updatedUser;
+            
+            if (isGoogleUser) {
+                // Update in Googleuser collection
+                updatedUser = await Googleuser.findByIdAndUpdate(
+                    request.user.id, 
+                    updateFields,
+                    { new: true }  // Return the updated document
+                );
+            } else {
+                // Update in User collection
+                updatedUser = await User.findByIdAndUpdate(
+                    request.user.id, 
+                    updateFields,
+                    { new: true }  // Return the updated document
+                );
+            }
 
             if (!updatedUser) {
                 console.log("User not found in database");
@@ -154,7 +187,7 @@ router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidati
                 message: 'User Information Updated!',
                 user: {
                     username: updatedUser.username,
-                    displayname: updatedUser.displayname,
+                    displayname: updatedUser.displayname || updatedUser.username,
                     email: updatedUser.email
                 }
             });
