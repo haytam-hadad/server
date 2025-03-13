@@ -16,7 +16,6 @@ export const createUserValidationSchema = {
     email: {
         in: ["body"],
         isEmail: true,
-        normalizeEmail: true,
         errorMessage: "Invalid email",
     },
     password: {
@@ -211,7 +210,16 @@ export const createArticleValidationSchema = {
     notEmpty: true,
     errorMessage: 'Category is required'
   },
-  imageUrl: {
+  mediaType: {
+    in: ['body'],
+    isString: true,
+    optional: true,
+    isIn: {
+      options: [['','image', 'video']],
+      errorMessage: 'Media type must be either image or video'
+    }
+  },
+  mediaUrl: {
     in: ['body'],
     isString: true,
     optional: true
@@ -243,4 +251,3 @@ export const createArticleValidationSchema = {
     isString: true
   }
 };
-
