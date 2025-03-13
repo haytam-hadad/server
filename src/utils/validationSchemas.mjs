@@ -198,6 +198,12 @@ export const createArticleValidationSchema = {
     notEmpty: true,
     errorMessage: 'Title is required'
   },
+  description: {
+    in: ['body'],
+    isString: true,
+    notEmpty: true,
+    errorMessage: 'Description is required'
+  },
   content: {
     in: ['body'],
     isString: true,
