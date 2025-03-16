@@ -4,7 +4,6 @@ import { Googleuser } from "../mongoose/schemas/googleuser.mjs";
 
 passport.serializeUser((user, done) => {
     console.log("Inside serializeUser:", user);
-    // Store user ID and type ('google' or 'local')
     done(null, { id: user._id, type: user.isGoogleUser ? "google" : "local" });
 });
 
@@ -12,7 +11,6 @@ passport.deserializeUser(async (obj, done) => {
     console.log("Inside deserializeUser, received:", obj);
     try {
         let findUser;
-        // Look up based on user type
         if (obj.type === "google") {
             findUser = await Googleuser.findById(obj.id);
         } else {

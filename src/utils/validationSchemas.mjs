@@ -201,7 +201,7 @@ export const createArticleValidationSchema = {
   description: {
     in: ['body'],
     isString: true,
-    notEmpty: true,
+    optional: true,
     errorMessage: 'Description is required'
   },
   content: {

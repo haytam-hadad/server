@@ -112,16 +112,15 @@ router.get('/api/news/:articleId', async (req, res) => {
   }
 });
 
-// Update the POST route to handle the new sources array
 router.post('/api/news/newpost', requireAuth, checkSchema(createArticleValidationSchema), async (request, response) => {
-  // Validate request data
+
   const result = validationResult(request);
   if (!result.isEmpty()) {
     return response.status(400).json({ errors: result.array() });
   }
 
   try {
-    // Extract validated data
+    
     const validatedData = matchedData(request);
     console.log("Validated data:", validatedData);
     
@@ -156,6 +155,126 @@ router.post('/api/news/newpost', requireAuth, checkSchema(createArticleValidatio
     });
   }
 });
+
+router.post('/api/news/:articleId/upvote', requireAuth, async (req, res) => {
+  try {
+    const { articleId } = req.params;
+    const username = req.user.username;
+
+    if (!mongoose.Types.ObjectId.isValid(articleId)) {
+      return res.status(400).json({ message: 'Invalid article ID format.' });
+    }
+
+    const article = await Article.findById(articleId);
+    if (!article) {
+      return res.status(404).json({ message: 'Article not found.' });
+    }
+    
+    const alreadyUpvoted = article.userUpvote.includes(username);
+    const alreadyDownvoted = article.userDownvote.includes(username);
+
+    if (alreadyUpvoted) {
+      // Remove the upvote
+      article.userUpvote = article.userUpvote.filter(user => user !== username);
+      article.upvote = Math.max(0, article.upvote - 1);
+    } else {
+      // If already disliked, remove the downvote first
+      if (alreadyDownvoted) {
+        article.userDownvote = article.userDownvote.filter(user => user !== username);
+        article.downvote = Math.max(0, article.downvote - 1);
+      }
+      // Add the upvote
+      article.userUpvote.push(username);
+      article.upvote += 1;
+    }
+
+    await article.save();
+    
+    return res.status(200).json({ 
+      message: alreadyUpvoted ? 'Like removed' : 'Article liked',
+      upvote: article.upvote,
+      downvote: article.downvote,
+      userLiked: !alreadyUpvoted,
+      userDisliked: false
+    });
+  } catch (error) {
+    console.error('Error liking article:', error);
+    return res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
+
+
+router.post('/api/news/:articleId/downvote', requireAuth, async (req, res) => {
+  try {
+    const { articleId } = req.params;
+    const username = req.user.username;
+
+    if (!mongoose.Types.ObjectId.isValid(articleId)) {
+      return res.status(400).json({ message: 'Invalid article ID format.' });
+    }
+
+    const article = await Article.findById(articleId);
+    if (!article) {
+      return res.status(404).json({ message: 'Article not found.' });
+    }
+
+    const alreadyDisliked = article.userDownvote.includes(username);
+    const alreadyUpvoted = article.userUpvote.includes(username);
+
+    if (alreadyDisliked) {
+      article.userDownvote = article.userDownvote.filter(user => user !== username);
+      article.downvote = Math.max(0, article.downvote - 1);
+    } else {
+      if (alreadyUpvoted) {
+        article.userUpvote = article.userUpvote.filter(user => user !== username);
+        article.upvote = Math.max(0, article.upvote - 1);
+      }
+      
+      article.userDownvote.push(username);
+      article.downvote += 1;
+    }
+
+    await article.save();
+    
+    return res.status(200).json({ 
+      message: alreadyDisliked ? 'Dislike removed' : 'Article disliked',
+      upvote: article.upvote,
+      downvote: article.downvote,
+      userLiked: false,
+      userDisliked: !alreadyDisliked
+    });
+  } catch (error) {
+    console.error('Error disliking article:', error);
+    return res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
+
+router.get('/api/news/:articleId/like-status', requireAuth, async (req, res) => {
+  try {
+    const { articleId } = req.params;
+    const username = req.user.username;
+
+    if (!mongoose.Types.ObjectId.isValid(articleId)) {
+      return res.status(400).json({ message: 'Invalid article ID format.' });
+    }
+
+    const article = await Article.findById(articleId);
+    if (!article) {
+      return res.status(404).json({ message: 'Article not found.' });
+    }
+
+    return res.status(200).json({
+      upvote: article.upvote,
+      downvote: article.downvote
+    });
+  } catch (error) {
+    console.error('Error getting like status:', error);
+    return res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
 
 export default router;
 
