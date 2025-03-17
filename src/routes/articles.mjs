@@ -101,7 +101,13 @@ router.get('/api/news/:articleId', async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(articleId)) {
       return res.status(400).json({ message: 'Invalid article ID format.' });
     }
-    const article = await Article.findById(articleId);
+    
+    const article = await Article.findByIdAndUpdate(
+      articleId,
+      { $inc: { views: 1 } },
+      { new: true }
+    )
+    
     if (!article) {
       return res.status(404).json({ message: 'Article not found.' });
     }
