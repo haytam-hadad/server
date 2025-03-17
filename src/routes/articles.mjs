@@ -107,7 +107,7 @@ router.get('/api/news/:articleId', async (req, res) => {
       { $inc: { views: 1 } },
       { new: true }
     )
-    
+
     if (!article) {
       return res.status(404).json({ message: 'Article not found.' });
     }
@@ -272,6 +272,7 @@ router.get('/api/news/:articleId/like-status', requireAuth, async (req, res) => 
     }
 
     return res.status(200).json({
+      views: article.views,
       upvote: article.upvote,
       downvote: article.downvote
     });
