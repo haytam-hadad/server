@@ -67,9 +67,6 @@ app.post("/api/auth",passport.authenticate("local"),(request,response)=>{
 //starting the server :
 
 const PORT = process.env.PORT || 5000;
-const useremail = process.env.EMAIL_USER;
-const userpassword = process.env.EMAIL_PASS;
-
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
@@ -119,44 +116,69 @@ app.post('/api/forgotpwd', async (req, res) => {
   const { email } = req.body;
   
   try {
-    // Find the user by email
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: "No account with that email address exists." });
     }
 
-    // Generate a random OTP (6 digits)
-    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
 
-    // Save OTP and expiration time (e.g., 10 minutes)
     user.resetOtp = otp;
     user.resetOtpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes from now
 
     await user.save();
 
-    // Configure nodemailer transport (adjust for your email service)
     const transporter = nodemailer.createTransport({
-      service: 'Gmail', // or another service
+      service: process.env.EMAIL_SERVICE,
       auth: {
-        user: useremail,
-        pass: userpassword
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
       },
       tls: {
-        rejectUnauthorized: false, // Allows self-signed certificates
+        rejectUnauthorized: false,
       }
     });
 
-    // Send the OTP via email
     const mailOptions = {
       to: user.email,
-      from: useremail,
+      from: process.env.EMAIL_USER,
       subject: 'Password Reset OTP',
-      text: `You are receiving this because you (or someone else) have requested a reset of the password for your account.\n\n
-      Your OTP is: ${otp}\n\n
-      This OTP will expire in 10 minutes.\n\n
-      If you did not request this, please ignore this email.`
-    };
-
+      html: `
+        <div style="
+          font-family: Arial, sans-serif;
+          background-color: #f9f9f9;
+          padding: 20px;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          text-align: center;
+          max-width: 400px;
+          margin: 0 auto;
+        ">
+          <h2 style="color: #4CAF50; margin-bottom: 10px;">Password Reset Request</h2>
+          <p style="font-size: 16px; color: #555;">
+            You've requested to reset your password. Use the following OTP to proceed:
+          </p>
+          <div style="
+            background-color: #4CAF50;
+            color: #fff;
+            font-size: 24px;
+            font-weight: bold;
+            padding: 10px 20px;
+            border-radius: 4px;
+            margin: 20px 0;
+            display: inline-block;
+          ">
+            ${otp}
+          </div>
+          <p style="font-size: 14px; color: #888;">
+            This OTP will expire in <b>10 minutes</b>.
+          </p>
+          <p style="font-size: 12px; color: #999;">
+            If you didn’t request this, please ignore this email.
+          </p>
+        </div>
+      `
+    };    
     await transporter.sendMail(mailOptions);
 
     return res.status(200).json({ message: 'An OTP has been sent to your email.' });
