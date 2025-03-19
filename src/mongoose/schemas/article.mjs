@@ -1,5 +1,12 @@
 import mongoose from "mongoose";
 
+const commentSchema = new mongoose.Schema({
+  text: { type: String, required: true },
+  author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+}, { _id: true });
+
 const articleSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, default: "" },
@@ -19,7 +26,8 @@ const articleSchema = new mongoose.Schema({
   sources: [{
     key: { type: String, enum: ["url", "video", "article", "book", "other"], default: "url" },
     value: { type: String, default: "" }
-  }]
+  }],
+  comments: [commentSchema]
 }, { timestamps: true });
 
 export const Article = mongoose.model("article", articleSchema);

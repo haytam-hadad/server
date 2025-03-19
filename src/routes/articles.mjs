@@ -282,6 +282,116 @@ router.get('/api/news/:articleId/like-status', requireAuth, async (req, res) => 
   }
 });
 
+router.post('/api/news/:articleId/comments', requireAuth, async (req, res) => {
+  try {
+    const { articleId } = req.params;
+    const { text } = req.body;
+    
+    if (!text || text.trim() === '') {
+      return res.status(400).json({ message: 'Comment text is required' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(articleId)) {
+      return res.status(400).json({ message: 'Invalid article ID format.' });
+    }
+
+    const article = await Article.findById(articleId);
+    if (!article) {
+      return res.status(404).json({ message: 'Article not found.' });
+    }
+
+    const newComment = {
+      text,
+      author: req.user._id, 
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    article.comments.push(newComment);
+    await article.save();
+
+    const populatedArticle = await Article.findById(articleId)
+      .populate({
+        path: 'comments.author',
+        select: 'username displayname profilePicture'
+      });
+    
+    const addedComment = populatedArticle.comments[populatedArticle.comments.length - 1];
+
+    return res.status(201).json({
+      message: 'Comment added successfully',
+      comment: addedComment
+    });
+  } catch (error) {
+    console.error('Error adding comment:', error);
+    return res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
+router.get('/api/news/:articleId/comments', async (req, res) => {
+  try {
+    const { articleId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(articleId)) {
+      return res.status(400).json({ message: 'Invalid article ID format.' });
+    }
+
+    const article = await Article.findById(articleId)
+      .select('comments')
+      .populate({
+        path: 'comments.author',
+        select: 'username displayname profilePicture'
+      });
+
+    if (!article) {
+      return res.status(404).json({ message: 'Article not found.' });
+    }
+
+    const articlecomments = article.comments;
+    return res.status(200).json({
+      comments: articlecomments,
+    });
+
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    return res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
+//for future use :
+
+/* router.delete('/api/news/:articleId/comments/:commentId', requireAuth, async (req, res) => {
+  try {
+    const { articleId, commentId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(articleId) || !mongoose.Types.ObjectId.isValid(commentId)) {
+      return res.status(400).json({ message: 'Invalid ID format.' });
+    }
+
+    const article = await Article.findById(articleId);
+    if (!article) {
+      return res.status(404).json({ message: 'Article not found.' });
+    }
+
+    // Find the comment
+    const comment = article.comments.id(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found.' });
+    }
+
+    // Check if user is authorized to delete (either comment author or admin)
+    if (comment.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to delete this comment.' });
+    }
+    article.comments.pull({ _id: commentId });
+    await article.save();
+
+    return res.status(200).json({ message: 'Comment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    return res.status(500).json({ error: 'Something went wrong.' });
+  }
+}); */
 
 export default router;
 
