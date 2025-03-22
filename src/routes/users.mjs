@@ -7,48 +7,71 @@ import { hashPassword } from "../utils/helpers.mjs";
 
 const router = Router();
 
-router.get(
-    "/api/users",
-    query("filter")
-        .optional()
-        .isString()
-        .withMessage("Filter must be a string")
-        .isLength({ min: 3, max: 10 })
-        .withMessage("Filter must be between 3 and 10 characters"),
-    query("value")
-        .optional()
-        .isString()
-        .withMessage("Value must be a string")
-        .notEmpty()
-        .withMessage("Value cannot be empty"),
-    async (request, response) => {
-        const result = validationResult(request);
-        if (!result.isEmpty()) {
-            return response.status(400).json(result.array());
-        }
 
-        const { filter, value } = request.query;
-
-        try {
-            // If no filter or value is provided, return an empty array
-            if (!filter || !value) {
-                return response.status(200).json([]);
-            }
-
-            // Fetch users with role "user" and apply filter
-            const users = await User.find({ 
-                role: "user", 
-                [filter]: new RegExp(value, "i") 
-            });
-
-            return response.status(200).json(users);
-        } catch (error) {
-            console.error(error);
-            return response.status(500).json({ error: "Something went wrong, please try again :)" });
-        }
+// Search for users by username, displayname, or email
+router.get("/api/users/search/:query", async (req, res) => {
+  try {
+    const { query } = req.params;
+    console.log("User search query received:", query);
+    
+    if (!query) {
+      return res.status(400).json({ error: 'Search query is required.' });
     }
-);
 
+    // Search in regular users
+    const users = await User.find({
+      $or: [
+        { username: { $regex: query, $options: 'i' } },
+        { displayname: { $regex: query, $options: 'i' } },
+        { email: { $regex: query, $options: 'i' } }
+      ]
+    }).select('username displayname profilePicture bio email'); // Include email in selection
+
+    // Search in Google users
+    const googleUsers = await Googleuser.find({
+      $or: [
+        { username: { $regex: query, $options: 'i' } },
+        { displayname: { $regex: query, $options: 'i' } },
+        { email: { $regex: query, $options: 'i' } }
+      ]
+    }).select('username displayname picture bio email'); // Include email in selection
+
+    // Format the results to have a consistent structure
+    const formattedUsers = users.map(user => ({
+      id: user._id,
+      username: user.username,
+      displayname: user.displayname || user.username,
+      email: user.email,
+      profilePicture: user.profilePicture || "",
+      bio: user.bio || "",
+      isGoogleUser: false
+    }));
+
+    const formattedGoogleUsers = googleUsers.map(user => ({
+      id: user._id,
+      username: user.username,
+      displayname: user.displayname || user.username,
+      email: user.email,
+      profilePicture: user.picture || "",
+      bio: user.bio || "",
+      isGoogleUser: true
+    }));
+
+    // Combine the results
+    const combinedResults = [...formattedUsers, ...formattedGoogleUsers];
+
+    // Sort by username
+    combinedResults.sort((a, b) => a.username.localeCompare(b.username));
+
+    return res.status(200).json({
+      users: combinedResults,
+      count: combinedResults.length
+    });
+  } catch (error) {
+    console.error("Error searching for users:", error);
+    return res.status(500).json({ error: "Something went wrong, please try again." });
+  }
+});
 
 router.post('/api/signup', checkSchema(createUserValidationSchema), async (request, response) => {
     console.log("Incoming request body:", request.body);
@@ -88,7 +111,6 @@ router.post('/api/signup', checkSchema(createUserValidationSchema), async (reque
 
 
 
-// Modified userprofile route to handle both regular and Google users
 router.get("/api/userprofile",
     query("username").isString().trim().withMessage("Username must be a string"),
     async (req, res) => {
@@ -200,5 +222,6 @@ router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidati
         return response.status(401).json({ message: 'Unauthenticated User' });
     }
 });
+
 
 export default router;

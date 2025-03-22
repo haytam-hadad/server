@@ -86,6 +86,7 @@ router.get('/api/news/search/:query', async (req, res) => {
     });
 
     console.log(`Found ${articles.length} articles for query "${query}"`);
+    console.log(articles);
 
     // Return empty array instead of 404 for no results
     return res.status(200).json(articles);
