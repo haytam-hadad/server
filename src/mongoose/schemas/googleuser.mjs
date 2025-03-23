@@ -17,9 +17,17 @@ const GoogleuserSchema = new mongoose.Schema({
     city: { type: String, default: "" },
     zipCode: { type: String, default: "" },
     birthdate: { type: Date, default: Date.now },
+    subscribers: [{ 
+        userId: { type: mongoose.Schema.Types.ObjectId },
+        userModel: { type: String, enum: ['User', 'Googleuser'], default: 'User' }
+    }],
+    subscriptions: [{ 
+        userId: { type: mongoose.Schema.Types.ObjectId },
+        userModel: { type: String, enum: ['User', 'Googleuser'], default: 'User' }
+    }],
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },    
 }, { timestamps: true });
 
 export const Googleuser = mongoose.model("Googleuser", GoogleuserSchema);
-  
+

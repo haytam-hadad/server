@@ -5,6 +5,14 @@ const UserSchema = new mongoose.Schema({
     displayname: { type: String, default: "", trim: true },
     email: { type: String, required: true, unique: true, lowercase: true },
     password: { type: String, required: true },
+    subscribers: [{ 
+        userId: { type: mongoose.Schema.Types.ObjectId },
+        userModel: { type: String, enum: ['User', 'Googleuser'], default: 'User' }
+      }],
+      subscriptions: [{ 
+        userId: { type: mongoose.Schema.Types.ObjectId },
+        userModel: { type: String, enum: ['User', 'Googleuser'], default: 'User' }
+      }],
     role: { type: String, enum: ["user", "admin"], default: "user" },  
     isActive: { type: Boolean, default: true }, 
     bio: { type: String, default: "" },
