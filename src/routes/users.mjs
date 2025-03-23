@@ -368,9 +368,18 @@ router.delete('/api/users/:userId/subscribe', requireAuth, async (req, res) => {
 router.get('/api/users/:userId/subscription-status', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
-    const currentUserId = req.user._id;
+    let currentUserId;
 
-    // Validate user ID
+    // Determine if the user is a Google user or a normal user
+    if (req.user.googleId) {
+      // Google user (using googleId)
+      currentUserId = req.user.googleId;
+    } else {
+      // Normal user (using _id)
+      currentUserId = req.user._id;
+    }
+
+    // Validate user ID format
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: 'Invalid user ID format.' });
     }
@@ -381,10 +390,13 @@ router.get('/api/users/:userId/subscription-status', requireAuth, async (req, re
       return res.status(404).json({ message: 'Current user not found.' });
     }
 
-    // Check if subscribed
-    const isSubscribed = currentUser.subscriptions.some(
-      sub => sub.toString() === userId
-    );
+    // Check if the current user is subscribed using find method
+    const subscription = await User.findOne({
+      _id: currentUserId,
+      'subscriptions': mongoose.Types.ObjectId(userId)
+    });
+
+    const isSubscribed = !!subscription; // If subscription exists, it's true
 
     return res.status(200).json({ 
       subscribed: isSubscribed
@@ -394,6 +406,7 @@ router.get('/api/users/:userId/subscription-status', requireAuth, async (req, re
     return res.status(500).json({ error: 'Something went wrong.' });
   }
 });
+
 
 // Get user's subscribers
 router.get('/api/users/:userId/subscribers', async (req, res) => {
