@@ -227,176 +227,131 @@ router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidati
 
 // Subscribe/Unsubscribe toggle endpoint
 router.post('/api/users/:userId/subscribe', requireAuth, async (req, res) => {
-    try {
-      const { userId } = req.params;
-      const currentUserId = req.user._id;
-      const currentUserModel = req.user.isGoogleUser ? 'Googleuser' : 'User';
-  
-      // Validate user ID
-      if (!mongoose.Types.ObjectId.isValid(userId)) {
-        return res.status(400).json({ message: 'Invalid user ID format.' });
-      }
-  
-      // Prevent subscribing to self
-      if (userId === currentUserId.toString()) {
-        return res.status(400).json({ message: 'You cannot subscribe to yourself.' });
-      }
-  
-      // Identify if the target user is a `User` or `Googleuser`
-      const targetUser = await User.findById(userId) || await Googleuser.findById(userId);
-      if (!targetUser) {
-        return res.status(404).json({ message: 'User not found.' });
-      }
-  
-      const targetUserModel = targetUser.isGoogleUser ? 'Googleuser' : 'User';
-  
-      // Check subscription status
-      const alreadySubscribed = req.user.subscriptions?.find(
-        sub => sub.userId?.toString() === userId && sub.userModel === targetUserModel
-      );       
-  
-      if (alreadySubscribed) {
-        // Unsubscribe
-        await User.findByIdAndUpdate(currentUserId, {
-          $pull: { subscriptions: { userId: new mongoose.Types.ObjectId(userId) } }
-        });
-  
-        await User.findByIdAndUpdate(userId, {
-          $pull: { subscribers: { userId: new mongoose.Types.ObjectId(currentUserId) } }
-        });
-  
-        return res.status(200).json({ 
-          message: 'Successfully unsubscribed from user.',
-          subscribed: false
-        });
-      } else {
-        // Subscribe
-        if (currentUserModel === 'Googleuser') {
-            await Googleuser.findByIdAndUpdate(currentUserId, { 
-                $addToSet: { subscriptions: { 
-                    userId: new mongoose.Types.ObjectId(userId),
-                    userModel: targetUserModel
-                } }
-            });
-        } else {
-            await User.findByIdAndUpdate(currentUserId, {
-                $addToSet: { subscriptions: { 
-                    userId: new mongoose.Types.ObjectId(userId),
-                    userModel: targetUserModel
-                } }
-            });
-        }
-        // Check target user's model to update the correct collection
-        if (targetUserModel === 'Googleuser') {
-            await Googleuser.findByIdAndUpdate(userId, {
-                $addToSet: { subscribers: { 
-                    userId: new mongoose.Types.ObjectId(currentUserId),
-                    userModel: currentUserModel
-                } }
-            });
-        } else {
-            await User.findByIdAndUpdate(userId, {
-                $addToSet: { subscribers: { 
-                    userId: new mongoose.Types.ObjectId(currentUserId),
-                    userModel: currentUserModel
-                } }
-            });
-        }
-        return res.status(200).json({ 
-            message: 'Successfully subscribed to user.',
-            subscribed: true
-        });
-      }
-    } catch (error) {
-      console.error('Error toggling subscription:', error);
-      return res.status(500).json({ error: 'Something went wrong.' });
-    }
-});  
-
-// Unsubscribe from a user (keeping this for backward compatibility)
-router.delete('/api/users/:userId/subscribe', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
     const currentUserId = req.user._id;
+    const currentUserModel = req.user.isGoogleUser ? 'Googleuser' : 'User';
 
     // Validate user ID
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: 'Invalid user ID format.' });
     }
 
-    // Find the target user
-    const targetUser = await User.findById(userId);
+    // Prevent subscribing to self
+    if (userId === currentUserId.toString()) {
+      return res.status(400).json({ message: 'You cannot subscribe to yourself.' });
+    }
+
+    // Identify if the target user is a `User` or `Googleuser`
+    const targetUser = await User.findById(userId) || await Googleuser.findById(userId);
     if (!targetUser) {
       return res.status(404).json({ message: 'User not found.' });
     }
 
-    // Find the current user
-    const currentUser = await User.findById(currentUserId);
-    if (!currentUser) {
-      return res.status(404).json({ message: 'Current user not found.' });
+    const targetUserModel = targetUser.isGoogleUser ? 'Googleuser' : 'User';
+
+    // Check subscription status
+    const alreadySubscribed = req.user.subscriptions?.find(
+      sub => sub.userId?.toString() === userId && sub.userModel === targetUserModel
+    );       
+
+    if (alreadySubscribed) {
+      // Unsubscribe
+      if (currentUserModel === 'Googleuser') {
+        await Googleuser.findByIdAndUpdate(currentUserId, {
+          $pull: { subscriptions: { userId: new mongoose.Types.ObjectId(userId) } }
+        });
+      } else {
+        await User.findByIdAndUpdate(currentUserId, {
+          $pull: { subscriptions: { userId: new mongoose.Types.ObjectId(userId) } }
+        });
+      }
+
+      if (targetUserModel === 'Googleuser') {
+        await Googleuser.findByIdAndUpdate(userId, {
+          $pull: { subscribers: { userId: new mongoose.Types.ObjectId(currentUserId) } }
+        });
+      } else {
+        await User.findByIdAndUpdate(userId, {
+          $pull: { subscribers: { userId: new mongoose.Types.ObjectId(currentUserId) } }
+        });
+      }
+      return res.status(200).json({ 
+        message: 'Successfully unsubscribed from user.',
+        subscribed: false
+      });
+    } else {
+      // Subscribe
+      if (currentUserModel === 'Googleuser') {
+          await Googleuser.findByIdAndUpdate(currentUserId, { 
+              $addToSet: { subscriptions: { 
+                  userId: new mongoose.Types.ObjectId(userId),
+                  userModel: targetUserModel
+              } }
+          });
+      } else {
+          await User.findByIdAndUpdate(currentUserId, {
+              $addToSet: { subscriptions: { 
+                  userId: new mongoose.Types.ObjectId(userId),
+                  userModel: targetUserModel
+              } }
+          });
+      }
+      // Check target user's model to update the correct collection
+      if (targetUserModel === 'Googleuser') {
+          await Googleuser.findByIdAndUpdate(userId, {
+              $addToSet: { subscribers: { 
+                  userId: new mongoose.Types.ObjectId(currentUserId),
+                  userModel: currentUserModel
+              } }
+          });
+      } else {
+          await User.findByIdAndUpdate(userId, {
+              $addToSet: { subscribers: { 
+                  userId: new mongoose.Types.ObjectId(currentUserId),
+                  userModel: currentUserModel
+              } }
+          });
+      }
+      return res.status(200).json({ 
+          message: 'Successfully subscribed to user.',
+          subscribed: true
+      });
     }
-
-    // Check if not subscribed
-    const isSubscribed = currentUser.subscriptions.some(
-      sub => sub.toString() === userId
-    );
-    if (!isSubscribed) {
-      return res.status(400).json({ message: 'You are not subscribed to this user.' });
-    }
-
-    // Update current user's subscriptions
-    await User.findByIdAndUpdate(currentUserId, {
-      $pull: { subscriptions: new mongoose.Types.ObjectId(userId) }
-    });
-
-    // Update target user's subscribers
-    await User.findByIdAndUpdate(userId, {
-      $pull: { subscribers: new mongoose.Types.ObjectId(currentUserId) }
-    });
-
-    return res.status(200).json({ 
-      message: 'Successfully unsubscribed from user.',
-      subscribed: false
-    });
   } catch (error) {
-    console.error('Error unsubscribing from user:', error);
+    console.error('Error toggling subscription:', error);
     return res.status(500).json({ error: 'Something went wrong.' });
   }
-});
+});  
 
-// Check subscription status
+// Check subscription status - FIXED
 router.get('/api/users/:userId/subscription-status', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
-    let currentUserId;
+    const currentUserId = req.user._id;
+    const currentUserModel = req.user.isGoogleUser ? 'Googleuser' : 'User';
 
-    // Determine if the user is a Google user or a normal user
-    if (req.user.googleId) {
-      // Google user (using googleId)
-      currentUserId = req.user.googleId;
-    } else {
-      // Normal user (using _id)
-      currentUserId = req.user._id;
-    }
-
-    // Validate user ID format
+    // Validate user ID
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: 'Invalid user ID format.' });
     }
 
-    // Find the current user
-    const currentUser = await User.findById(currentUserId);
+    // Find the current user in the appropriate model
+    let currentUser;
+    if (currentUserModel === 'Googleuser') {
+      currentUser = await Googleuser.findById(currentUserId);
+    } else {
+      currentUser = await User.findById(currentUserId);
+    }
+
     if (!currentUser) {
       return res.status(404).json({ message: 'Current user not found.' });
     }
 
-    // Check if the current user is subscribed using find method
-    const subscription = await User.findOne({
-      _id: currentUserId,
-      'subscriptions': mongoose.Types.ObjectId(userId)
-    });
-
-    const isSubscribed = !!subscription; // If subscription exists, it's true
+    // Check if the current user is subscribed by looking for the target userId in subscriptions
+    const isSubscribed = currentUser.subscriptions.some(
+      sub => sub.userId.toString() === userId
+    );
 
     return res.status(200).json({ 
       subscribed: isSubscribed
@@ -408,7 +363,7 @@ router.get('/api/users/:userId/subscription-status', requireAuth, async (req, re
 });
 
 
-// Get user's subscribers
+// Get user's subscribers - FIXED
 router.get('/api/users/:userId/subscribers', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -418,20 +373,59 @@ router.get('/api/users/:userId/subscribers', async (req, res) => {
       return res.status(400).json({ message: 'Invalid user ID format.' });
     }
 
-    // Find the user with populated subscribers
-    const userWithSubscribers = await User.findById(userId)
-      .populate({
-        path: 'subscribers',
-        select: 'username displayname profilePicture'
-      });
+    // First check if user exists in User model
+    let user = await User.findById(userId);
+    let userModel = 'User';
+    
+    // If not found, check Googleuser model
+    if (!user) {
+      user = await Googleuser.findById(userId);
+      userModel = 'Googleuser';
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found.' });
+      }
+    }
 
-    if (!userWithSubscribers) {
-      return res.status(404).json({ message: 'User not found.' });
+    // Get all subscriber details
+    const populatedSubscribers = [];
+    
+    for (const subscriber of user.subscribers) {
+      let subscriberUser;
+      
+      // Check which model the subscriber belongs to
+      if (subscriber.userModel === 'Googleuser') {
+        subscriberUser = await Googleuser.findById(subscriber.userId)
+          .select('_id username displayname picture');
+          
+        if (subscriberUser) {
+          populatedSubscribers.push({
+            _id: subscriberUser._id,
+            userId: subscriberUser._id, // Include userId as requested
+            username: subscriberUser.username,
+            displayname: subscriberUser.displayname || subscriberUser.username,
+            profilePicture: subscriberUser.picture || ""
+          });
+        }
+      } else {
+        subscriberUser = await User.findById(subscriber.userId)
+          .select('_id username displayname profilePicture');
+          
+        if (subscriberUser) {
+          populatedSubscribers.push({
+            _id: subscriberUser._id,
+            userId: subscriberUser._id, // Include userId as requested
+            username: subscriberUser.username,
+            displayname: subscriberUser.displayname || subscriberUser.username,
+            profilePicture: subscriberUser.profilePicture || ""
+          });
+        }
+      }
     }
 
     return res.status(200).json({
-      subscribers: userWithSubscribers.subscribers,
-      total: userWithSubscribers.subscribers.length
+      subscribers: populatedSubscribers,
+      total: populatedSubscribers.length
     });
   } catch (error) {
     console.error('Error fetching subscribers:', error);
@@ -439,7 +433,7 @@ router.get('/api/users/:userId/subscribers', async (req, res) => {
   }
 });
 
-// Get user's subscriptions
+// Get user's subscriptions - FIXED
 router.get('/api/users/:userId/subscriptions', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -449,20 +443,59 @@ router.get('/api/users/:userId/subscriptions', async (req, res) => {
       return res.status(400).json({ message: 'Invalid user ID format.' });
     }
 
-    // Find the user with populated subscriptions
-    const userWithSubscriptions = await User.findById(userId)
-      .populate({
-        path: 'subscriptions',
-        select: 'username displayname profilePicture'
-      });
+    // First check if user exists in User model
+    let user = await User.findById(userId);
+    let userModel = 'User';
+    
+    // If not found, check Googleuser model
+    if (!user) {
+      user = await Googleuser.findById(userId);
+      userModel = 'Googleuser';
+      
+      if (!user) {
+        return res.status(404).json({ message: 'User not found.' });
+      }
+    }
 
-    if (!userWithSubscriptions) {
-      return res.status(404).json({ message: 'User not found.' });
+    // Get all subscription details
+    const populatedSubscriptions = [];
+    
+    for (const subscription of user.subscriptions) {
+      let subscriptionUser;
+      
+      // Check which model the subscription belongs to
+      if (subscription.userModel === 'Googleuser') {
+        subscriptionUser = await Googleuser.findById(subscription.userId)
+          .select('_id username displayname picture');
+          
+        if (subscriptionUser) {
+          populatedSubscriptions.push({
+            _id: subscriptionUser._id,
+            userId: subscriptionUser._id, // Include userId as requested
+            username: subscriptionUser.username,
+            displayname: subscriptionUser.displayname || subscriptionUser.username,
+            profilePicture: subscriptionUser.picture || ""
+          });
+        }
+      } else {
+        subscriptionUser = await User.findById(subscription.userId)
+          .select('_id username displayname profilePicture');
+          
+        if (subscriptionUser) {
+          populatedSubscriptions.push({
+            _id: subscriptionUser._id,
+            userId: subscriptionUser._id, // Include userId as requested
+            username: subscriptionUser.username,
+            displayname: subscriptionUser.displayname || subscriptionUser.username,
+            profilePicture: subscriptionUser.profilePicture || ""
+          });
+        }
+      }
     }
 
     return res.status(200).json({
-      subscriptions: userWithSubscriptions.subscriptions,
-      total: userWithSubscriptions.subscriptions.length
+      subscriptions: populatedSubscriptions,
+      total: populatedSubscriptions.length
     });
   } catch (error) {
     console.error('Error fetching subscriptions:', error);
@@ -472,3 +505,4 @@ router.get('/api/users/:userId/subscriptions', async (req, res) => {
 
 
 export default router;
+
