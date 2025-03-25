@@ -11,6 +11,7 @@ const articleSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, default: "" },
   content: { type: String, required: true },
+  deleted: { type: Boolean, default: false },
   authorusername: { type: String, required: true },
   authordisplayname: { type: String, required: true },
   category: { type: String, required: true },
