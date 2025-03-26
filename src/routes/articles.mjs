@@ -16,6 +16,8 @@ router.get('/api/news/latest', async (req, res) => {
     if (latestNews.length === 0) {
       return res.status(404).json({ message: 'No latest news available.' });
     }
+    
+    // Return the articles directly, authorpicture is already included in the schema
     res.json(latestNews);
   } catch (err) {
     console.error('Error fetching latest news:', err);
@@ -36,6 +38,7 @@ router.get('/api/news/category/:category', async (req, res) => {
       return res.status(404).json({ message: `No articles found for category: ${category}` });
     }
 
+    // Return the articles directly, authorpicture is already included in the schema
     res.json(articles);
   } catch (err) {
     console.error('Error fetching articles by category:', err);
@@ -63,6 +66,7 @@ router.get('/api/articles/:username', async (req, res) => {
       return res.status(404).json({ message: `No articles found for username: ${username}` });
     }
 
+    // Return the articles directly, authorpicture is already included in the schema
     res.status(200).json(articles);
   } catch (error) {
     console.error("Error fetching articles by username:", error);
@@ -123,6 +127,8 @@ router.get('/api/news/:articleId', async (req, res) => {
     if (!article) {
       return res.status(404).json({ message: 'Article not found or has been deleted.' });
     }
+    
+    // Return the article directly, authorpicture is already included in the schema
     res.json(article);
   } catch (error) {
     console.error('Error fetching article by ID:', error);
@@ -165,11 +171,15 @@ router.post('/api/news/newpost', requireAuth, checkSchema(createArticleValidatio
     const validatedData = matchedData(request);
     console.log("Validated data:", validatedData);
     
+    // Get the profile picture based on user type (regular vs Google)
+    const profilePicture = request.user.isGoogleUser ? request.user.picture : request.user.profilePicture;
+    
     // Create article data object with validated data
     const articleData = {
       ...validatedData,
       authorusername: request.user.username,
       authordisplayname: request.user.displayname,
+      authorpicture: profilePicture || "",
       status: validatedData.status || "on-going"
     };
 
@@ -349,14 +359,30 @@ router.post('/api/news/:articleId/comments', requireAuth, async (req, res) => {
       updatedAt: new Date()
     };
 
-    const updatedArticle = await Article.findOneAndUpdate(
-      { _id: articleId, deleted: { $ne: true } },
-      { $push: { comments: newComment } },
-      { new: true }
-    ).populate({
-      path: 'comments.author',
-      select: 'username displayname profilePicture'
-    });
+    const isGoogleUser = req.user.isGoogleUser;
+    let updatedArticle;
+
+    if (isGoogleUser) {
+      updatedArticle = await Article.findOneAndUpdate(
+        { _id: articleId, deleted: { $ne: true } },
+        { $push: { comments: newComment } },
+        { new: true }
+      ).populate({
+        path: 'comments.author',
+        model: 'Googleuser',
+        select: 'username displayname picture'
+      });
+    } else {
+      updatedArticle = await Article.findOneAndUpdate(
+        { _id: articleId, deleted: { $ne: true } },
+        { $push: { comments: newComment } },
+        { new: true }
+      ).populate({
+        path: 'comments.author',
+        model: 'User',
+        select: 'username displayname profilePicture'
+      });
+    }
 
     if (!updatedArticle) {
       return res.status(404).json({ message: 'Article not found or has been deleted.' });
@@ -364,10 +390,21 @@ router.post('/api/news/:articleId/comments', requireAuth, async (req, res) => {
 
     const addedComment = updatedArticle.comments[updatedArticle.comments.length - 1];
 
-    return res.status(201).json({
-      message: 'Comment added successfully',
-      comment: addedComment
-    });
+    // For Google users, rename "picture" to "profilePicture" for consistency
+    if (isGoogleUser && addedComment.author && addedComment.author.picture) {
+      const commentObj = addedComment.toObject();
+      commentObj.author.profilePicture = commentObj.author.picture;
+      delete commentObj.author.picture;
+      return res.status(201).json({
+        message: 'Comment added successfully',
+        comment: commentObj
+      });
+    } else {
+      return res.status(201).json({
+        message: 'Comment added successfully',
+        comment: addedComment
+      });
+    }
   } catch (error) {
     console.error('Error adding comment:', error);
     return res.status(500).json({ error: 'Something went wrong.' });
@@ -382,28 +419,79 @@ router.get('/api/news/:articleId/comments', async (req, res) => {
       return res.status(400).json({ message: 'Invalid article ID format.' });
     }
 
-    const article = await Article.findById(articleId)
-      .select('comments')
-      .populate({
-        path: 'comments.author',
-        select: 'username displayname profilePicture'
-      });
+    // First, get the article with comments
+    const article = await Article.findById(articleId).select('comments');
 
     if (!article) {
       return res.status(404).json({ message: 'Article not found.' });
     }
 
-    const articlecomments = article.comments;
-    return res.status(200).json({
-      comments: articlecomments,
+    // Sort comments by newest first
+    const sortedComments = article.comments.sort((a, b) => b.createdAt - a.createdAt);
+    
+    // Get all unique author IDs
+    const authorIds = [...new Set(sortedComments.map(comment => comment.author.toString()))];
+    
+    // Fetch all regular users in one query
+    const regularUsers = await mongoose.model('User').find({
+      _id: { $in: authorIds }
+    }).select('_id username displayname profilePicture').lean();
+    
+    // Fetch all Google users in one query
+    const googleUsers = await mongoose.model('Googleuser').find({
+      _id: { $in: authorIds }
+    }).select('_id username displayname picture').lean();
+    
+    // Create a map for quick lookup
+    const userMap = {};
+    
+    // Add regular users to the map
+    regularUsers.forEach(user => {
+      userMap[user._id.toString()] = {
+        _id: user._id,
+        username: user.username,
+        displayname: user.displayname || user.username,
+        profilePicture: user.profilePicture || "" // Regular user profile picture
+      };
+    });
+    
+    // Add Google users to the map
+    googleUsers.forEach(user => {
+      userMap[user._id.toString()] = {
+        _id: user._id,
+        username: user.username,
+        displayname: user.displayname || user.username,
+        profilePicture: user.picture || "" // Google user profile picture (normalized to profilePicture)
+      };
+    });
+    
+    // Populate comments with author information from the map
+    const populatedComments = sortedComments.map(comment => {
+      const authorId = comment.author.toString();
+      const author = userMap[authorId] || {
+        _id: comment.author,
+        username: 'Unknown User',
+        displayname: 'Unknown User',
+        profilePicture: ""
+      };
+      
+      return {
+        _id: comment._id,
+        text: comment.text,
+        createdAt: comment.createdAt,
+        updatedAt: comment.updatedAt,
+        author
+      };
     });
 
+    return res.status(200).json({
+      comments: populatedComments
+    });
   } catch (error) {
     console.error('Error fetching comments:', error);
     return res.status(500).json({ error: 'Something went wrong.' });
   }
 });
-
 
 router.delete('/api/news/:articleId/comments/:commentId', requireAuth, async (req, res) => {
   try {
@@ -471,9 +559,7 @@ router.delete('/api/news/:articleId/comments/:commentId', requireAuth, async (re
       });
     }
 
-    // Now that we've verified authorization, remove the comment
-    // Use the pull method with the correct syntax
-    article.comments.pull(commentId); // This is the correct way to pull by _id
+    article.comments.pull(commentId); 
     await article.save();
 
     return res.status(200).json({

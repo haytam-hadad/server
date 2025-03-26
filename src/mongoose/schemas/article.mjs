@@ -14,6 +14,7 @@ const articleSchema = new mongoose.Schema({
   deleted: { type: Boolean, default: false },
   authorusername: { type: String, required: true },
   authordisplayname: { type: String, required: true },
+  authorpicture: { type: String, default: "" },
   category: { type: String, required: true },
   publishedAt: { type: Date, default: Date.now },
   views: { type: Number, default: 0 },
