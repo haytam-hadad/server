@@ -404,40 +404,91 @@ router.get('/api/news/:articleId/comments', async (req, res) => {
   }
 });
 
-//for future use :
 
-/* router.delete('/api/news/:articleId/comments/:commentId', requireAuth, async (req, res) => {
+router.delete('/api/news/:articleId/comments/:commentId', requireAuth, async (req, res) => {
   try {
     const { articleId, commentId } = req.params;
+    const userId = req.user._id;
+    const isAdmin = req.user.role === 'admin';
 
+    // Validate IDs
     if (!mongoose.Types.ObjectId.isValid(articleId) || !mongoose.Types.ObjectId.isValid(commentId)) {
-      return res.status(400).json({ message: 'Invalid ID format.' });
+      return res.status(400).json({
+        success: false,
+        error: 'ValidationError',
+        message: 'Invalid ID format.'
+      });
     }
 
-    const article = await Article.findById(articleId);
+    // Find the article
+    const article = await Article.findOne({
+      _id: articleId,
+      deleted: { $ne: true }
+    });
+
     if (!article) {
-      return res.status(404).json({ message: 'Article not found.' });
+      return res.status(404).json({
+        success: false,
+        error: 'NotFound',
+        message: 'Article not found or has been deleted.'
+      });
     }
 
-    // Find the comment
+    // Find the specific comment
     const comment = article.comments.id(commentId);
     if (!comment) {
-      return res.status(404).json({ message: 'Comment not found.' });
+      return res.status(404).json({
+        success: false,
+        error: 'NotFound',
+        message: 'Comment not found.'
+      });
     }
 
-    // Check if user is authorized to delete (either comment author or admin)
-    if (comment.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized to delete this comment.' });
+    // Debug information to understand the data types
+    console.log('Comment author:', comment.author);
+    console.log('Comment author type:', typeof comment.author);
+    console.log('User ID:', userId);
+    console.log('User ID type:', typeof userId);
+    
+    // Convert both to strings for comparison
+    const commentAuthorId = comment.author.toString();
+    const currentUserId = userId.toString();
+    
+    console.log('Comment author as string:', commentAuthorId);
+    console.log('User ID as string:', currentUserId);
+    
+    // Check authorization - only comment author or admin can delete
+    const isCommentAuthor = commentAuthorId === currentUserId;
+    
+    console.log('Is comment author?', isCommentAuthor);
+    console.log('Is admin?', isAdmin);
+
+    if (!isCommentAuthor && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'Not authorized to delete this comment.'
+      });
     }
-    article.comments.pull({ _id: commentId });
+
+    // Now that we've verified authorization, remove the comment
+    // Use the pull method with the correct syntax
+    article.comments.pull(commentId); // This is the correct way to pull by _id
     await article.save();
 
-    return res.status(200).json({ message: 'Comment deleted successfully' });
+    return res.status(200).json({
+      success: true,
+      message: 'Comment deleted successfully'
+    });
   } catch (error) {
     console.error('Error deleting comment:', error);
-    return res.status(500).json({ error: 'Something went wrong.' });
+    return res.status(500).json({
+      success: false,
+      error: 'ServerError',
+      message: 'Something went wrong.'
+    });
   }
-}); */
+});
 
 export default router;
 
