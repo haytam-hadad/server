@@ -365,23 +365,21 @@ router.get('/api/users/:userId/subscription-status', requireAuth, async (req, re
 });
 
 
-// Get user's subscribers - FIXED
-router.get('/api/users/:userId/subscribers', async (req, res) => {
+router.get('/api/users/:username/subscribers', async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { username } = req.params;
 
-    // Validate user ID
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: 'Invalid user ID format.' });
+    if (!username) {
+      return res.status(400).json({ message: 'Username is required.' });
     }
 
     // First check if user exists in User model
-    let user = await User.findById(userId);
+    let user = await User.findOne({ username });
     let userModel = 'User';
     
     // If not found, check Googleuser model
     if (!user) {
-      user = await Googleuser.findById(userId);
+      user = await Googleuser.findOne({ username });
       userModel = 'Googleuser';
       
       if (!user) {
@@ -435,23 +433,22 @@ router.get('/api/users/:userId/subscribers', async (req, res) => {
   }
 });
 
-// Get user's subscriptions - FIXED
-router.get('/api/users/:userId/subscriptions', async (req, res) => {
+// Get user's subscriptions by username
+router.get('/api/users/:username/subscriptions', async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { username } = req.params;
 
-    // Validate user ID
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: 'Invalid user ID format.' });
+    if (!username) {
+      return res.status(400).json({ message: 'Username is required.' });
     }
 
     // First check if user exists in User model
-    let user = await User.findById(userId);
+    let user = await User.findOne({ username });
     let userModel = 'User';
     
     // If not found, check Googleuser model
     if (!user) {
-      user = await Googleuser.findById(userId);
+      user = await Googleuser.findOne({ username });
       userModel = 'Googleuser';
       
       if (!user) {
@@ -504,7 +501,6 @@ router.get('/api/users/:userId/subscriptions', async (req, res) => {
     return res.status(500).json({ error: 'Something went wrong.' });
   }
 });
-
 
 export default router;
 
