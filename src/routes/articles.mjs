@@ -111,6 +111,28 @@ router.get('/api/news/search/:query', async (req, res) => {
   }
 });
 
+router.get('/api/news/trending', async (req, res) => {
+  try {
+      const trendingArticles = await Article.find({
+          views: { $gt: 99 }, 
+          deleted: { $ne: true },
+          status: 'approved'     
+      })
+      .sort({ views: -1 })       
+      .limit(15)
+      .populate('authorId', 'username displayname profilePicture');
+
+      if (!trendingArticles.length) {
+          return res.status(404).json({ message: "No trending articles found." });
+      }
+      res.status(200).json({
+          articles: trendingArticles,
+      });
+  } catch (error) {
+      res.status(500).json({ error: 'Something went wrong while fetching trending articles.' });
+  }
+});
+
 router.get('/api/news/:articleId', async (req, res) => {
   try {
     const { articleId } = req.params;
@@ -134,6 +156,31 @@ router.get('/api/news/:articleId', async (req, res) => {
     console.error('Error fetching article by ID:', error);
     res.status(500).json({ error: 'Something went wrong.' });
   }
+});
+
+router.get('/api/post/subscribed', requireAuth, async (req, res) => {
+    try {
+        const { subscriptions } = req.user;
+        console.log("User Subscriptions:", subscriptions);
+
+
+        if (!subscriptions || subscriptions.length === 0) {
+            return res.status(200).json({ articles: [], message: "You have no subscriptions." });
+        }
+
+        // Extract all subscribed user IDs
+        const subscribedUserIds = subscriptions.map(sub => sub.userId);
+
+        // Fetch articles from all subscribed users
+        const articles = await Article.find({
+            authorId: { $in: subscribedUserIds }
+        }).populate('authorId', 'username displayname profilePicture'); 
+
+        res.status(200).json({ articles });
+    } catch (error) {
+        console.error('Error fetching subscribed articles:', error);
+        res.status(500).json({ error: 'Something went wrong while fetching articles.' });
+    }
 });
 
 router.delete('/api/news/:articleId', requireAuth, async (req, res)=>{
@@ -172,11 +219,12 @@ router.post('/api/news/newpost', requireAuth, checkSchema(createArticleValidatio
     console.log("Validated data:", validatedData);
     
     // Get the profile picture based on user type (regular vs Google)
-    const profilePicture = request.user.isGoogleUser ? request.user.picture : request.user.profilePicture;
+    const profilePicture = request.user.profilePicture;
     
     // Create article data object with validated data
     const articleData = {
       ...validatedData,
+      authorId: request.user._id,
       authorusername: request.user.username,
       authordisplayname: request.user.displayname,
       authorpicture: profilePicture || "",
@@ -359,52 +407,25 @@ router.post('/api/news/:articleId/comments', requireAuth, async (req, res) => {
       updatedAt: new Date()
     };
 
-    const isGoogleUser = req.user.isGoogleUser;
-    let updatedArticle;
-
-    if (isGoogleUser) {
-      updatedArticle = await Article.findOneAndUpdate(
-        { _id: articleId, deleted: { $ne: true } },
-        { $push: { comments: newComment } },
-        { new: true }
-      ).populate({
-        path: 'comments.author',
-        model: 'Googleuser',
-        select: 'username displayname picture'
-      });
-    } else {
-      updatedArticle = await Article.findOneAndUpdate(
-        { _id: articleId, deleted: { $ne: true } },
-        { $push: { comments: newComment } },
-        { new: true }
-      ).populate({
-        path: 'comments.author',
-        model: 'User',
-        select: 'username displayname profilePicture'
-      });
-    }
+    const updatedArticle = await Article.findOneAndUpdate(
+      { _id: articleId, deleted: { $ne: true } },
+      { $push: { comments: newComment } },
+      { new: true }
+    ).populate({
+      path: 'comments.author',
+      select: 'username displayname profilePicture'
+    });
 
     if (!updatedArticle) {
       return res.status(404).json({ message: 'Article not found or has been deleted.' });
     }
 
     const addedComment = updatedArticle.comments[updatedArticle.comments.length - 1];
+    return res.status(201).json({
+      message: 'Comment added successfully',
+      comment: addedComment
+    });
 
-    // For Google users, rename "picture" to "profilePicture" for consistency
-    if (isGoogleUser && addedComment.author && addedComment.author.picture) {
-      const commentObj = addedComment.toObject();
-      commentObj.author.profilePicture = commentObj.author.picture;
-      delete commentObj.author.picture;
-      return res.status(201).json({
-        message: 'Comment added successfully',
-        comment: commentObj
-      });
-    } else {
-      return res.status(201).json({
-        message: 'Comment added successfully',
-        comment: addedComment
-      });
-    }
   } catch (error) {
     console.error('Error adding comment:', error);
     return res.status(500).json({ error: 'Something went wrong.' });
@@ -440,7 +461,7 @@ router.get('/api/news/:articleId/comments', async (req, res) => {
     // Fetch all Google users in one query
     const googleUsers = await mongoose.model('Googleuser').find({
       _id: { $in: authorIds }
-    }).select('_id username displayname picture').lean();
+    }).select('_id username displayname profilePicture').lean();
     
     // Create a map for quick lookup
     const userMap = {};
@@ -461,7 +482,7 @@ router.get('/api/news/:articleId/comments', async (req, res) => {
         _id: user._id,
         username: user.username,
         displayname: user.displayname || user.username,
-        profilePicture: user.picture || "" // Google user profile picture (normalized to profilePicture)
+        profilePicture: user.profilePicture || "" 
       };
     });
     

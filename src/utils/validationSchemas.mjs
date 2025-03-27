@@ -85,6 +85,11 @@ export const createUserValidationSchema = {
         optional: true,
         isURL: { errorMessage: "Invalid profile picture URL" },
     },
+    profileBanner: {
+      in: ["body"],
+      optional: true,
+      isURL: { errorMessage: "Invalid profile banner URL" },
+    },
 };
 
 
@@ -188,6 +193,18 @@ export const updateUserValidationSchema = {
       if: (value) => value && value.length > 0
     },
   },
+  profilePicture: {
+    optional: true,
+    isURL: {
+        errorMessage: 'profilePicture must be a valid URL'
+    }
+  },
+  profileBanner: {
+      optional: true,
+      isURL: {
+          errorMessage: 'profileBanner must be a valid URL'
+      }
+  }
 };
 
 

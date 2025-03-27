@@ -49,7 +49,7 @@ passport.use(
             isGoogleUser: true,
             
             // Profile information
-            picture: profile.photos?.[0]?.value || "",
+            profilePicture: profile.photos?.[0]?.value || "",
             emailVerified: profile._json?.email_verified || false,
             
             // Optional fields - using defaults from schema
@@ -66,7 +66,7 @@ passport.use(
           await user.save();
         } else {
           // Update existing user with latest Google profile data
-          user.picture = profile.photos?.[0]?.value || user.picture;
+          user.profilePicture = profile.photos?.[0]?.value || user.profilePicture;
           user.emailVerified = profile._json?.email_verified || user.emailVerified;
           user.displayname = profile.displayName || user.displayname;
           

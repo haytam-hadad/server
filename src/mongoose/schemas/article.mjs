@@ -12,6 +12,7 @@ const articleSchema = new mongoose.Schema({
   description: { type: String, default: "" },
   content: { type: String, required: true },
   deleted: { type: Boolean, default: false },
+  authorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   authorusername: { type: String, required: true },
   authordisplayname: { type: String, required: true },
   authorpicture: { type: String, default: "" },

@@ -36,7 +36,7 @@ router.get("/api/users/search/:query", async (req, res) => {
         { displayname: { $regex: query, $options: 'i' } },
         { email: { $regex: query, $options: 'i' } }
       ]
-    }).select('username displayname picture bio email'); // Include email in selection
+    }).select('username displayname profilePicture bio email'); // Include email in selection
 
     // Format the results to have a consistent structure
     const formattedUsers = users.map(user => ({
@@ -54,7 +54,7 @@ router.get("/api/users/search/:query", async (req, res) => {
       username: user.username,
       displayname: user.displayname || user.username,
       email: user.email,
-      profilePicture: user.picture || "",
+      profilePicture: user.profilePicture || "",
       bio: user.bio || "",
       isGoogleUser: true
     }));
@@ -151,79 +151,81 @@ router.get("/api/userprofile",
 
 // Modified profile update route to handle both regular and Google users
 router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidationSchema), async (request, response) => {
-    if (request.user) {
-        console.log("Received profile update request:", request.body);
-        
-        const result = validationResult(request);
-        if (!result.isEmpty()) {
-            console.log("Validation errors:", result.array());
-            return response.status(400).json({ errors: result.array() });
-        }
-        
-        const data = matchedData(request);
-        console.log("Validated data:", data);
-        
-        const updateFields = {};
+  if (request.user) {
+      console.log("Received profile update request:", request.body);
+      
+      const result = validationResult(request);
+      if (!result.isEmpty()) {
+          console.log("Validation errors:", result.array());
+          return response.status(400).json({ errors: result.array() });
+      }
+      
+      const data = matchedData(request);
+      console.log("Validated data:", data);
+      
+      const updateFields = {};
 
-        // Add all fields from the validated data to updateFields
-        if (data.username) updateFields.username = data.username;
-        if (data.displayname !== undefined) updateFields.displayname = data.displayname;
-        if (data.email) updateFields.email = data.email;
-        if (data.phone !== undefined) updateFields.phone = data.phone;
-        if (data.website !== undefined) updateFields.website = data.website;
-        if (data.bio !== undefined) updateFields.bio = data.bio;
-        if (data.birthdate) updateFields.birthdate = data.birthdate;
-        if (data.gender !== undefined) updateFields.gender = data.gender;
-        if (data.country !== undefined) updateFields.country = data.country;
-        if (data.city !== undefined) updateFields.city = data.city;
-        if (data.zipCode !== undefined) updateFields.zipCode = data.zipCode;
+      // Add all fields from the validated data to updateFields
+      if (data.username) updateFields.username = data.username;
+      if (data.displayname !== undefined) updateFields.displayname = data.displayname;
+      if (data.email) updateFields.email = data.email;
+      if (data.phone !== undefined) updateFields.phone = data.phone;
+      if (data.website !== undefined) updateFields.website = data.website;
+      if (data.bio !== undefined) updateFields.bio = data.bio;
+      if (data.birthdate) updateFields.birthdate = data.birthdate;
+      if (data.gender !== undefined) updateFields.gender = data.gender;
+      if (data.country !== undefined) updateFields.country = data.country;
+      if (data.city !== undefined) updateFields.city = data.city;
+      if (data.zipCode !== undefined) updateFields.zipCode = data.zipCode;
+      if (data.profilePicture) updateFields.profilePicture = data.profilePicture;
+      if (data.profileBanner) updateFields.profileBanner = data.profileBanner;
 
-        console.log("Fields to update:", updateFields);
+      console.log("Fields to update:", updateFields);
 
-        try {
-            // Check if the user is a Google user
-            const isGoogleUser = request.user.isGoogleUser;
-            let updatedUser;
-            
-            if (isGoogleUser) {
-                // Update in Googleuser collection
-                updatedUser = await Googleuser.findByIdAndUpdate(
-                    request.user.id, 
-                    updateFields,
-                    { new: true }  // Return the updated document
-                );
-            } else {
-                // Update in User collection
-                updatedUser = await User.findByIdAndUpdate(
-                    request.user.id, 
-                    updateFields,
-                    { new: true }  // Return the updated document
-                );
-            }
+      try {
+          const isGoogleUser = request.user.isGoogleUser;
+          let updatedUser;
+          
+          if (isGoogleUser) {
+              updatedUser = await Googleuser.findByIdAndUpdate(
+                  request.user.id, 
+                  updateFields,
+                  { new: true }
+              );
+          } else {
+              updatedUser = await User.findByIdAndUpdate(
+                  request.user.id, 
+                  updateFields,
+                  { new: true }
+              );
+          }
 
-            if (!updatedUser) {
-                console.log("User not found in database");
-                return response.status(404).json({ message: 'User not found' });
-            }
-            
-            console.log("User updated successfully:", updatedUser.username);
-            return response.status(200).json({ 
-                message: 'User Information Updated!',
-                user: {
-                    username: updatedUser.username,
-                    displayname: updatedUser.displayname || updatedUser.username,
-                    email: updatedUser.email
-                }
-            });
-        } catch (error) {
-            console.error("Error updating user:", error);
-            return response.status(500).json({ message: 'Error updating user information' });
-        }
-    } else {
-        console.log("Unauthenticated user attempted to update profile");
-        return response.status(401).json({ message: 'Unauthenticated User' });
-    }
+          if (!updatedUser) {
+              console.log("User not found in database");
+              return response.status(404).json({ message: 'User not found' });
+          }
+
+          console.log("User updated successfully:", updatedUser.username);
+          return response.status(200).json({ 
+              message: 'User Information Updated!',
+              user: {
+                  username: updatedUser.username,
+                  displayname: updatedUser.displayname || updatedUser.username,
+                  email: updatedUser.email,
+                  profilePicture: updatedUser.profilePicture || "",
+                  profileBanner: updatedUser.profileBanner || ""
+              }
+          });
+      } catch (error) {
+          console.error("Error updating user:", error);
+          return response.status(500).json({ message: 'Error updating user information' });
+      }
+  } else {
+      console.log("Unauthenticated user attempted to update profile");
+      return response.status(401).json({ message: 'Unauthenticated User' });
+  }
 });
+
 
 // Subscribe/Unsubscribe toggle endpoint
 router.post('/api/users/:userId/subscribe', requireAuth, async (req, res) => {
@@ -396,7 +398,7 @@ router.get('/api/users/:userId/subscribers', async (req, res) => {
       // Check which model the subscriber belongs to
       if (subscriber.userModel === 'Googleuser') {
         subscriberUser = await Googleuser.findById(subscriber.userId)
-          .select('_id username displayname picture');
+          .select('_id username displayname profilePicture');
           
         if (subscriberUser) {
           populatedSubscribers.push({
@@ -404,7 +406,7 @@ router.get('/api/users/:userId/subscribers', async (req, res) => {
             userId: subscriberUser._id, // Include userId as requested
             username: subscriberUser.username,
             displayname: subscriberUser.displayname || subscriberUser.username,
-            profilePicture: subscriberUser.picture || ""
+            profilePicture: subscriberUser.profilePicture || ""
           });
         }
       } else {
@@ -466,7 +468,7 @@ router.get('/api/users/:userId/subscriptions', async (req, res) => {
       // Check which model the subscription belongs to
       if (subscription.userModel === 'Googleuser') {
         subscriptionUser = await Googleuser.findById(subscription.userId)
-          .select('_id username displayname picture');
+          .select('_id username displayname profilePicture');
           
         if (subscriptionUser) {
           populatedSubscriptions.push({
@@ -474,7 +476,7 @@ router.get('/api/users/:userId/subscriptions', async (req, res) => {
             userId: subscriptionUser._id, // Include userId as requested
             username: subscriptionUser.username,
             displayname: subscriptionUser.displayname || subscriptionUser.username,
-            profilePicture: subscriptionUser.picture || ""
+            profilePicture: subscriptionUser.profilePicture || ""
           });
         }
       } else {
