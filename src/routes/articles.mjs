@@ -11,13 +11,14 @@ const router = Router();
 router.get('/api/news/latest', async (req, res) => {
   try {
     const latestNews = await Article.find({ deleted: { $ne: true } }) 
+      .populate('authorId', 'username displayname profilePicture')
       .sort({ publishedAt: -1 })
       .limit(10);
     if (latestNews.length === 0) {
       return res.status(404).json({ message: 'No latest news available.' });
     }
     
-    // Return the articles directly, authorpicture is already included in the schema
+    // Return the articles with populated user info
     res.json(latestNews);
   } catch (err) {
     console.error('Error fetching latest news:', err);
@@ -32,13 +33,14 @@ router.get('/api/news/category/:category', async (req, res) => {
     const articles = await Article.find({
       category,
       deleted: { $ne: true } 
-    });
+    })
+    .populate('authorId', 'username displayname profilePicture');
 
     if (articles.length === 0) {
       return res.status(404).json({ message: `No articles found for category: ${category}` });
     }
 
-    // Return the articles directly, authorpicture is already included in the schema
+    // Return the articles with populated user info
     res.json(articles);
   } catch (err) {
     console.error('Error fetching articles by category:', err);
@@ -58,7 +60,8 @@ router.get('/api/articles/:username', async (req, res) => {
     const articles = await Article.find({ 
       authorusername: { $regex: new RegExp(`^${username}$`, 'i') }, 
       deleted: { $ne: true }
-    });
+    })
+    .populate('authorId', 'username displayname profilePicture');
 
     console.log("Articles found:", articles.length);
 
@@ -66,7 +69,7 @@ router.get('/api/articles/:username', async (req, res) => {
       return res.status(404).json({ message: `No articles found for username: ${username}` });
     }
 
-    // Return the articles directly, authorpicture is already included in the schema
+    // Return the articles with populated user info
     res.status(200).json(articles);
   } catch (error) {
     console.error("Error fetching articles by username:", error);
@@ -98,7 +101,8 @@ router.get('/api/news/search/:query', async (req, res) => {
           ]
         }
       ]
-    });
+    })
+    .populate('authorId', 'username displayname profilePicture');
 
     console.log(`Found ${articles.length} articles for query "${query}"`);
     console.log(articles);
@@ -144,13 +148,14 @@ router.get('/api/news/:articleId', async (req, res) => {
       { _id: articleId, deleted: { $ne: true } }, // Correct condition to exclude deleted articles
       { $inc: { views: 1 } },                     // Increment views
       { new: true }                               // Return the updated document
-    );
+    )
+    .populate('authorId', 'username displayname profilePicture');
 
     if (!article) {
       return res.status(404).json({ message: 'Article not found or has been deleted.' });
     }
     
-    // Return the article directly, authorpicture is already included in the schema
+    // Return the article with populated user info
     res.json(article);
   } catch (error) {
     console.error('Error fetching article by ID:', error);
@@ -159,28 +164,29 @@ router.get('/api/news/:articleId', async (req, res) => {
 });
 
 router.get('/api/post/subscribed', requireAuth, async (req, res) => {
-    try {
-        const { subscriptions } = req.user;
-        console.log("User Subscriptions:", subscriptions);
-
-
-        if (!subscriptions || subscriptions.length === 0) {
-            return res.status(200).json({ articles: [], message: "You have no subscriptions." });
-        }
-
-        // Extract all subscribed user IDs
-        const subscribedUserIds = subscriptions.map(sub => sub.userId);
-
-        // Fetch articles from all subscribed users
-        const articles = await Article.find({
-            authorId: { $in: subscribedUserIds }
-        }).populate('authorId', 'username displayname profilePicture'); 
-
-        res.status(200).json({ articles });
-    } catch (error) {
-        console.error('Error fetching subscribed articles:', error);
-        res.status(500).json({ error: 'Something went wrong while fetching articles.' });
+  try {
+    // Check if user has subscriptions
+    if (!req.user || !req.user.subscriptions || req.user.subscriptions.length === 0) {
+      return res.status(200).json({ articles: [], message: "You have no subscriptions." });
     }
+
+    // Extract user IDs from subscriptions
+    const subscribedUserIds = req.user.subscriptions.map(sub => sub.userId);
+    
+    // Find articles from subscribed users
+    // Use both authorId and authorusername to ensure compatibility
+    const articles = await Article.find({
+      authorId: { $in: subscribedUserIds },
+      deleted: { $ne: true }
+    })
+    .populate('authorId', 'username displayname profilePicture')
+    .sort({ publishedAt: -1 });    
+
+    res.status(200).json({ articles });
+  } catch (error) {
+    console.error('Error fetching subscribed articles:', error);
+    res.status(500).json({ error: 'Something went wrong while fetching articles.' });
+  }
 });
 
 router.delete('/api/news/:articleId', requireAuth, async (req, res)=>{
@@ -226,8 +232,6 @@ router.post('/api/news/newpost', requireAuth, checkSchema(createArticleValidatio
       ...validatedData,
       authorId: request.user._id,
       authorusername: request.user.username,
-      authordisplayname: request.user.displayname,
-      authorpicture: profilePicture || "",
       status: validatedData.status || "on-going"
     };
 
@@ -303,9 +307,6 @@ router.post('/api/news/:articleId/upvote', requireAuth, async (req, res) => {
     return res.status(500).json({ error: 'Something went wrong.' });
   }
 });
-
-
-
 
 router.post('/api/news/:articleId/downvote', requireAuth, async (req, res) => {
   try {
@@ -440,17 +441,14 @@ router.get('/api/news/:articleId/comments', async (req, res) => {
       return res.status(400).json({ message: 'Invalid article ID format.' });
     }
 
-    // First, get the article with comments
     const article = await Article.findById(articleId).select('comments');
 
     if (!article) {
       return res.status(404).json({ message: 'Article not found.' });
     }
 
-    // Sort comments by newest first
     const sortedComments = article.comments.sort((a, b) => b.createdAt - a.createdAt);
-    
-    // Get all unique author IDs
+  
     const authorIds = [...new Set(sortedComments.map(comment => comment.author.toString()))];
     
     // Fetch all regular users in one query
@@ -597,5 +595,129 @@ router.delete('/api/news/:articleId/comments/:commentId', requireAuth, async (re
   }
 });
 
-export default router;
+// Save/unsave an article
+router.post('/api/news/:articleId/save', requireAuth, async (req, res) => {
+  try {
+    const { articleId } = req.params;
+    const userId = req.user._id;
 
+    if (!mongoose.Types.ObjectId.isValid(articleId)) {
+      return res.status(400).json({ message: 'Invalid article ID format.' });
+    }
+
+    // Check if the article exists and is not deleted
+    const article = await Article.findOne({ 
+      _id: articleId, 
+      deleted: { $ne: true } 
+    });
+
+    if (!article) {
+      return res.status(404).json({ message: 'Article not found or has been deleted.' });
+    }
+
+    // Check if the article is already saved by the user
+    const isAlreadySaved = article.saved.some(
+      item => item.userId.toString() === userId.toString()
+    );
+
+    if (isAlreadySaved) {
+      // If already saved, remove it (unsave)
+      await Article.updateOne(
+        { _id: articleId },
+        { $pull: { saved: { userId } } }
+      );
+      
+      return res.status(200).json({ 
+        saved: false, 
+        message: 'Article removed from saved items.' 
+      });
+    } else {
+      // If not saved, save it
+      await Article.updateOne(
+        { _id: articleId },
+        { 
+          $push: { 
+            saved: { 
+              userId,
+              articleId,
+              savedAt: new Date()
+            } 
+          } 
+        }
+      );
+      
+      return res.status(200).json({ 
+        saved: true, 
+        message: 'Article saved successfully.' 
+      });
+    }
+  } catch (error) {
+    console.error('Error saving/unsaving article:', error);
+    return res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
+// Get saved status for an article
+router.get('/api/news/:articleId/save-status', requireAuth, async (req, res) => {
+  try {
+    const { articleId } = req.params;
+    const userId = req.user._id;
+
+    if (!mongoose.Types.ObjectId.isValid(articleId)) {
+      return res.status(400).json({ message: 'Invalid article ID format.' });
+    }
+
+    const article = await Article.findOne({ 
+      _id: articleId,
+      'saved.userId': userId
+    });
+    
+    return res.status(200).json({
+      saved: !!article
+    });
+  } catch (error) {
+    console.error('Error checking save status:', error);
+    return res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
+// Get all saved articles for the current user
+router.get('/api/news/saved/list', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    // Find all articles saved by this user
+    const savedArticles = await Article.find({
+      'saved.userId': userId,
+      deleted: { $ne: true }
+    })
+    .populate('authorId', 'username displayname profilePicture');
+    
+    if (savedArticles.length === 0) {
+      return res.status(200).json({ 
+        articles: [],
+        message: 'No saved articles found.' 
+      });
+    }
+    
+    // Map the articles to include the savedAt date
+    const articlesWithSavedDate = savedArticles.map(article => {
+      const savedInfo = article.saved.find(item => item.userId.toString() === userId.toString());
+
+      return {
+        ...article.toObject(),
+        savedAt: savedInfo.savedAt
+      };
+    });
+
+    // Sort articles directly in MongoDB query instead of JavaScript
+    articlesWithSavedDate.sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt));
+
+    return res.status(200).json({ articles: articlesWithSavedDate });
+  } catch (error) {
+    console.error('Error fetching saved articles:', error);
+    return res.status(500).json({ error: 'Something went wrong while fetching saved articles.' });
+  }
+});
+
+export default router;

@@ -7,6 +7,12 @@ const commentSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 }, { _id: true });
 
+const savedArticleSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
+  articleId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'article' },
+  savedAt: { type: Date, default: Date.now }
+}, { timestamps: true });
+
 const articleSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, default: "" },
@@ -14,8 +20,6 @@ const articleSchema = new mongoose.Schema({
   deleted: { type: Boolean, default: false },
   authorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   authorusername: { type: String, required: true },
-  authordisplayname: { type: String, required: true },
-  authorpicture: { type: String, default: "" },
   category: { type: String, required: true },
   publishedAt: { type: Date, default: Date.now },
   views: { type: Number, default: 0 },
@@ -30,7 +34,8 @@ const articleSchema = new mongoose.Schema({
     key: { type: String, enum: ["url", "video", "article", "book", "other"], default: "url" },
     value: { type: String, default: "" }
   }],
-  comments: [commentSchema]
+  comments: [commentSchema],
+  saved: [savedArticleSchema]
 }, { timestamps: true });
 
 export const Article = mongoose.model("article", articleSchema);
