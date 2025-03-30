@@ -1,7 +1,8 @@
 import { Router } from "express";
 import {query,validationResult,body,matchedData, checkSchema} from 'express-validator';
-import { User} from "../mongoose/schemas/user.mjs";
+import { User } from "../mongoose/schemas/user.mjs";
 import { Googleuser } from "../mongoose/schemas/googleuser.mjs";
+import { Article } from "../mongoose/schemas/article.mjs";
 import { requireAuth } from "../middleware/auth.mjs";
 import { createUserValidationSchema , updateUserValidationSchema} from "../utils/validationSchemas.mjs";
 import { hashPassword } from "../utils/helpers.mjs";
@@ -111,6 +112,54 @@ router.post('/api/signup', checkSchema(createUserValidationSchema), async (reque
     }
 });
 
+router.get("/api/user/rating/:username", async (req, res) => {
+  try {
+    const { username } = req.params;
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required.' });
+    }
+
+    // Find articles with the given username and rating >= 75
+    const articles = await Article.find({ 
+      authorusername: username,
+      deleted: { $ne: true },
+      rating: { $gte: 75 }
+    });
+
+    if (articles.length === 0) {
+      return res.status(404).json({ error: 'No articles found.' });
+    }
+
+    // Calculate badge based on number of articles
+    let badge;
+    const nbrart = articles.length;
+
+    if (nbrart === 0) {
+      badge = "Iron";
+    } else if (nbrart === 10) {
+      badge = "Bronze";
+    } else if (nbrart === 30) {
+      badge = "Silver";
+    } else if (nbrart === 50) {
+      badge = "Gold";
+    } else if (nbrart >= 100) {
+      badge = "Platinum";
+    }
+
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+    
+    user.badge = badge;
+    await user.save();
+
+    return res.status(200).json({ rating: user.rating, badge: user.badge });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
 
 
 router.get("/api/userprofile",

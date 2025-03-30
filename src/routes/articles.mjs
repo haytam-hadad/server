@@ -4,6 +4,7 @@ import { validationResult, matchedData, checkSchema } from 'express-validator';
 import { createArticleValidationSchema } from "../utils/validationSchemas.mjs";
 import mongoose from "mongoose";
 import { requireAuth } from "../middleware/auth.mjs";
+import { calculateAndUpdateRating } from "../utils/helpers.mjs";
 
 const router = Router();
 
@@ -17,6 +18,15 @@ router.get('/api/news/latest', async (req, res) => {
     if (latestNews.length === 0) {
       return res.status(404).json({ message: 'No latest news available.' });
     }
+    
+    // Update ratings for all articles
+    await Promise.all(latestNews.map(async (article) => {
+      // Only update if rating is old or missing
+      if (!article.lastRatingUpdate || 
+          new Date() - new Date(article.lastRatingUpdate) > 3600000) { // 1 hour
+        await calculateAndUpdateRating(article);
+      }
+    }));
     
     // Return the articles with populated user info
     res.json(latestNews);
@@ -39,6 +49,15 @@ router.get('/api/news/category/:category', async (req, res) => {
     if (articles.length === 0) {
       return res.status(404).json({ message: `No articles found for category: ${category}` });
     }
+
+    // Update ratings for all articles
+    await Promise.all(articles.map(async (article) => {
+      // Only update if rating is old or missing
+      if (!article.lastRatingUpdate || 
+          new Date() - new Date(article.lastRatingUpdate) > 3600000) { // 1 hour
+        await calculateAndUpdateRating(article);
+      }
+    }));
 
     // Return the articles with populated user info
     res.json(articles);
@@ -68,6 +87,15 @@ router.get('/api/articles/:username', async (req, res) => {
     if (articles.length === 0) {
       return res.status(404).json({ message: `No articles found for username: ${username}` });
     }
+
+    // Update ratings for all articles
+    await Promise.all(articles.map(async (article) => {
+      // Only update if rating is old or missing
+      if (!article.lastRatingUpdate || 
+          new Date() - new Date(article.lastRatingUpdate) > 3600000) { // 1 hour
+        await calculateAndUpdateRating(article);
+      }
+    }));
 
     // Return the articles with populated user info
     res.status(200).json(articles);
@@ -105,7 +133,15 @@ router.get('/api/news/search/:query', async (req, res) => {
     .populate('authorId', 'username displayname profilePicture');
 
     console.log(`Found ${articles.length} articles for query "${query}"`);
-    console.log(articles);
+
+    // Update ratings for all articles
+    await Promise.all(articles.map(async (article) => {
+      // Only update if rating is old or missing
+      if (!article.lastRatingUpdate || 
+          new Date() - new Date(article.lastRatingUpdate) > 3600000) { // 1 hour
+        await calculateAndUpdateRating(article);
+      }
+    }));
 
     // Return empty array instead of 404 for no results
     return res.status(200).json(articles);
@@ -117,23 +153,28 @@ router.get('/api/news/search/:query', async (req, res) => {
 
 router.get('/api/news/trending', async (req, res) => {
   try {
-      const trendingArticles = await Article.find({
-          views: { $gt: 99 }, 
-          deleted: { $ne: true },
-          status: 'approved'     
-      })
-      .sort({ views: -1 })       
-      .limit(15)
-      .populate('authorId', 'username displayname profilePicture');
+    const trendingArticles = await Article.find({
+      views: { $gt: 99 }, 
+      deleted: { $ne: true },
+      status: 'approved'     
+    })
+    .sort({ views: -1 })       
+    .limit(15)
+    .populate('authorId', 'username displayname profilePicture');
 
-      if (!trendingArticles.length) {
-          return res.status(404).json({ message: "No trending articles found." });
-      }
-      res.status(200).json({
-          articles: trendingArticles,
-      });
+    if (!trendingArticles.length) {
+      return res.status(404).json({ message: "No trending articles found." });
+    }
+
+    // Update ratings for all trending articles
+    // Always update ratings for trending articles since they're important
+    await Promise.all(trendingArticles.map(article => calculateAndUpdateRating(article)));
+
+    res.status(200).json({
+      articles: trendingArticles,
+    });
   } catch (error) {
-      res.status(500).json({ error: 'Something went wrong while fetching trending articles.' });
+    res.status(500).json({ error: 'Something went wrong while fetching trending articles.' });
   }
 });
 
@@ -155,11 +196,35 @@ router.get('/api/news/:articleId', async (req, res) => {
       return res.status(404).json({ message: 'Article not found or has been deleted.' });
     }
     
+    // Always update rating when viewing a single article
+    await calculateAndUpdateRating(article);
+    
     // Return the article with populated user info
     res.json(article);
   } catch (error) {
     console.error('Error fetching article by ID:', error);
     res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
+router.get("/api/post/rating/:articleId", async (req, res) => {
+  try {
+    const article = await Article.findById(req.params.articleId);
+    if (!article) return res.status(404).json({ message: "Article not found." });
+
+    // Calculate and update the rating
+    const ratingPercentage = await calculateAndUpdateRating(article);
+
+    res.json({
+      upvote: article.upvote,
+      downvote: article.downvote,
+      views: article.views,
+      sources: article.sources.length,
+      rating: ratingPercentage
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error fetching rating." });
   }
 });
 
@@ -181,6 +246,15 @@ router.get('/api/post/subscribed', requireAuth, async (req, res) => {
     })
     .populate('authorId', 'username displayname profilePicture')
     .sort({ publishedAt: -1 });    
+
+    // Update ratings for all articles
+    await Promise.all(articles.map(async (article) => {
+      // Only update if rating is old or missing
+      if (!article.lastRatingUpdate || 
+          new Date() - new Date(article.lastRatingUpdate) > 3600000) { // 1 hour
+        await calculateAndUpdateRating(article);
+      }
+    }));
 
     res.status(200).json({ articles });
   } catch (error) {
@@ -232,7 +306,9 @@ router.post('/api/news/newpost', requireAuth, checkSchema(createArticleValidatio
       ...validatedData,
       authorId: request.user._id,
       authorusername: request.user.username,
-      status: validatedData.status || "on-going"
+      status: validatedData.status || "on-going",
+      rating: 0, // Initialize rating to 0
+      lastRatingUpdate: new Date()
     };
 
     // Ensure sources is an array
@@ -245,6 +321,9 @@ router.post('/api/news/newpost', requireAuth, checkSchema(createArticleValidatio
     // Create and save the article
     const newArticle = new Article(articleData);
     const savedArticle = await newArticle.save();
+
+    // Calculate initial rating
+    await calculateAndUpdateRating(savedArticle);
 
     return response.status(201).json({
       message: "Article created successfully",
@@ -295,12 +374,16 @@ router.post('/api/news/:articleId/upvote', requireAuth, async (req, res) => {
 
     const updatedArticle = await Article.findByIdAndUpdate(articleId, update, { new: true });
 
+    // Update the rating after changing upvotes
+    const newRating = await calculateAndUpdateRating(updatedArticle);
+
     return res.status(200).json({
       message: alreadyUpvoted ? 'Like removed' : 'Article liked',
       upvote: updatedArticle.upvote,
       downvote: updatedArticle.downvote,
       userLiked: !alreadyUpvoted,
-      userDisliked: false
+      userDisliked: false,
+      rating: newRating // Include the updated rating
     });
   } catch (error) {
     console.error('Error liking article:', error);
@@ -344,12 +427,16 @@ router.post('/api/news/:articleId/downvote', requireAuth, async (req, res) => {
 
     const updatedArticle = await Article.findByIdAndUpdate(articleId, update, { new: true });
 
+    // Update the rating after changing downvotes
+    const newRating = await calculateAndUpdateRating(updatedArticle);
+
     return res.status(200).json({
       message: alreadyDisliked ? 'Dislike removed' : 'Article disliked',
       upvote: updatedArticle.upvote,
       downvote: updatedArticle.downvote,
       userLiked: false,
-      userDisliked: !alreadyDisliked
+      userDisliked: !alreadyDisliked,
+      rating: newRating // Include the updated rating
     });
   } catch (error) {
     console.error('Error disliking article:', error);
@@ -380,7 +467,8 @@ router.get('/api/news/:articleId/like-status', requireAuth, async (req, res) => 
       upvote: article.upvote,
       downvote: article.downvote,
       userLiked,
-      userDisliked
+      userDisliked,
+      rating: article.rating // Include the rating
     });
   } catch (error) {
     console.error('Error getting like status:', error);
@@ -699,6 +787,14 @@ router.get('/api/news/saved/list', requireAuth, async (req, res) => {
         message: 'No saved articles found.' 
       });
     }
+    
+    await Promise.all(savedArticles.map(async (article) => {
+      // Only update if rating is old or missing
+      if (!article.lastRatingUpdate || 
+          new Date() - new Date(article.lastRatingUpdate) > 3600000) { // 1 hour
+        await calculateAndUpdateRating(article);
+      }
+    }));
     
     // Map the articles to include the savedAt date
     const articlesWithSavedDate = savedArticles.map(article => {

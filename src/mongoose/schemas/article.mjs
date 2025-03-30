@@ -22,6 +22,8 @@ const articleSchema = new mongoose.Schema({
   authorusername: { type: String, required: true },
   category: { type: String, required: true },
   publishedAt: { type: Date, default: Date.now },
+  rating : { type: Number, default: 0 },
+  lastRatingUpdate: { type: Date, default: Date.now },
   views: { type: Number, default: 0 },
   upvote: { type: Number, default: 0 },
   downvote: { type: Number, default: 0 },

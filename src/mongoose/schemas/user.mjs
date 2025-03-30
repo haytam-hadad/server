@@ -15,6 +15,7 @@ const UserSchema = new mongoose.Schema({
       }],
     role: { type: String, enum: ["user", "admin"], default: "user" },  
     isActive: { type: Boolean, default: true }, 
+    badge: { type: String, enum: ["Iron","Bronze", "Silver", "Gold", "Platinum"], default: "Iron" },
     bio: { type: String, default: "" },
     phone: { type: String, default: "" },
     website: { type: String, default: "" },

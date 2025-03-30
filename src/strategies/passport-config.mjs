@@ -3,7 +3,6 @@ import { User } from "../mongoose/schemas/user.mjs";
 import { Googleuser } from "../mongoose/schemas/googleuser.mjs";
 
 passport.serializeUser((user, done) => {
-    console.log("Inside serializeUser:", user);
     done(null, { id: user._id, type: user.isGoogleUser ? "google" : "local" });
 });
 
