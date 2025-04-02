@@ -44,7 +44,8 @@ router.get('/api/news/category/:category', async (req, res) => {
       category,
       deleted: { $ne: true } 
     })
-    .populate('authorId', 'username displayname profilePicture');
+    .populate('authorId', 'username displayname profilePicture')
+    .sort({ publishedAt: -1 });
 
     if (articles.length === 0) {
       return res.status(404).json({ message: `No articles found for category: ${category}` });
@@ -67,6 +68,30 @@ router.get('/api/news/category/:category', async (req, res) => {
   }
 });
 
+//get top categories
+router.get('/api/news/topcategories/', async (req, res) => {
+  try {
+    
+    const topCategories = await Article.aggregate([
+      { $match: { deleted: { $ne: true } } }, // Ignore deleted articles
+      { $group: { 
+          _id: "$category", 
+          totalArticles: { $sum: 1 } // Count how many articles belong to each category
+      }},
+      { $sort: { totalArticles: -1 } }, // Sort by most articles first
+      { $limit: 5 } // Get the top 5 categories (change as needed)
+    ]);    
+
+    if (topCategories.length === 0) {
+      return res.status(404).json({ message: ` No categories found `});
+    }
+    res.json(topCategories);
+  } catch (err) {
+    console.error('Error fetching Top categories:', err);
+    res.status(500).json({ error: 'Error fetching Top categories.' });
+  }
+});
+
 router.get('/api/articles/:username', async (req, res) => {
   try {
     const { username } = req.params;
@@ -80,7 +105,8 @@ router.get('/api/articles/:username', async (req, res) => {
       authorusername: { $regex: new RegExp(`^${username}$`, 'i') }, 
       deleted: { $ne: true }
     })
-    .populate('authorId', 'username displayname profilePicture');
+    .populate('authorId', 'username displayname profilePicture')
+    .sort({ publishedAt: -1 });
 
     console.log("Articles found:", articles.length);
 
@@ -98,6 +124,46 @@ router.get('/api/articles/:username', async (req, res) => {
     }));
 
     // Return the articles with populated user info
+    res.status(200).json(articles);
+  } catch (error) {
+    console.error("Error fetching articles by username:", error);
+    res.status(500).json({ message: "Something went wrong" });
+  }
+});
+
+router.get('/api/articles/upvoted/:username', async (req, res) => {
+  try {
+    const { username } = req.params;
+    if (!username) {
+      return res.status(400).json({ message: "Username is required" });
+    }
+
+    console.log("Fetching articles for username:", username);
+
+    const articles = await Article.find({ 
+      userUpvote: username,
+      deleted: { $ne: true }
+    })
+    .populate('authorId', 'username displayname profilePicture')
+    .sort({ publishedAt: -1 });
+
+    console.log("Articles found:", articles.length);
+
+    if (articles.length === 0) {
+      return res.status(404).json({ message: `No articles found for username: ${username}` });
+    }
+
+    //Filter articles needing a rating update before executing DB updates
+    const articlesNeedingUpdate = articles.filter(article => 
+      !article.lastRatingUpdate || 
+      new Date() - new Date(article.lastRatingUpdate) > 3600000 // Older than 1 hour
+    );
+
+    if (articlesNeedingUpdate.length > 0) {
+      console.log(`Updating ratings for ${articlesNeedingUpdate.length} articles`);
+      await Promise.all(articlesNeedingUpdate.map(article => calculateAndUpdateRating(article)));
+    }
+
     res.status(200).json(articles);
   } catch (error) {
     console.error("Error fetching articles by username:", error);
@@ -130,7 +196,8 @@ router.get('/api/news/search/:query', async (req, res) => {
         }
       ]
     })
-    .populate('authorId', 'username displayname profilePicture');
+    .populate('authorId', 'username displayname profilePicture')
+    .sort({ publishedAt: -1 });
 
     console.log(`Found ${articles.length} articles for query "${query}"`);
 
@@ -779,7 +846,8 @@ router.get('/api/news/saved/list', requireAuth, async (req, res) => {
       'saved.userId': userId,
       deleted: { $ne: true }
     })
-    .populate('authorId', 'username displayname profilePicture');
+    .populate('authorId', 'username displayname profilePicture')
+    .sort({ publishedAt: -1 });
     
     if (savedArticles.length === 0) {
       return res.status(200).json({ 
