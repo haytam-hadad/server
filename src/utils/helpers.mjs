@@ -24,8 +24,11 @@ export async function calculateAndUpdateRating(article) {
       }
     }
 
-    // Define Weights
-    const W_l = 0.5, W_d = 0.3, W_v = 0.2, W_s = 0.3;
+    // Adjusted Weights
+    const W_l = 0.6,  // More importance to likes
+          W_d = 0.2,  // Less penalty for dislikes
+          W_v = 0.4,  // More importance to views
+          W_s = 0.3;  // Keep weight for sources
 
     // Compute Raw Rating
     const rawRating = (
@@ -36,19 +39,19 @@ export async function calculateAndUpdateRating(article) {
     );
 
     // Define Min & Max Rating for Normalization
-    const minRating = -100;  // If an article is heavily disliked
-    const maxRating = 1000;  // If an article is highly liked & viewed
+    const minRating = 0;   // Worst-case scenario (no likes, no views)
+    const maxRating = 500; // Best-case scenario (high likes & views)
 
-    // Normalize to 0-100%
-    let ratingPercentage = ((rawRating - minRating) / (maxRating - minRating)) * 100;
-    ratingPercentage = Math.max(0, Math.min(100, ratingPercentage));
-    
+    // Normalize to 50-100%
+    let ratingPercentage = 50 + ((rawRating - minRating) / (maxRating - minRating)) * 50;
+    ratingPercentage = Math.max(50, Math.min(100, ratingPercentage));
+
     // Update the article's rating in the database
     await Article.findByIdAndUpdate(article._id, { 
       rating: ratingPercentage,
       lastRatingUpdate: new Date()
     });
-    
+
     return ratingPercentage;
   } catch (error) {
     console.error('Error calculating article rating:', error);
