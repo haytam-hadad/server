@@ -198,6 +198,97 @@ router.get("/api/userprofile",
     }
 );
 
+router.get("/api/userprofile/overview", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // Fetch the user details excluding sensitive information
+    let user = await User.findById(userId).select(
+      "-password -resetOtp -resetOtpExpires -__v -role -isActive -updatedAt -bio -email"
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Count the total articles authored by the user
+    const totalArticles = await Article.countDocuments({ authorId: userId, deleted: false });
+
+    // Aggregate total likes (upvotes) for the user's articles
+    const totalLikes = await Article.aggregate([
+      { $match: { authorId: userId, deleted: false } },
+      { $group: { _id: null, totalLikes: { $sum: "$upvote" } } },
+    ]);
+
+    // Aggregate total views for the user's articles
+    const totalViews = await Article.aggregate([
+      { $match: { authorId: userId, deleted: false } },
+      { $group: { _id: null, totalViews: { $sum: "$views" } } },
+    ]);
+
+    // Find the most popular (most viewed) article
+    const mostPopularArticle = await Article.findOne({ authorId: userId, status: "approved", deleted: false })
+      .sort({ views: -1 })
+      .select("title views");
+
+    // Count the total comments made by the user
+    const totalComments = await Article.aggregate([
+      { $match: { authorId: userId, deleted: false } },
+      { $unwind: "$comments" },
+      { $match: { "comments.author": userId } },
+      { $count: "totalComments" }
+    ]);
+
+    // Aggregate the number of articles published by month for the past year
+    const articlesByMonth = await Article.aggregate([
+      { $match: { authorId: userId, deleted: false, publishedAt: { $gte: new Date(new Date().setFullYear(new Date().getFullYear() - 1)) } } },
+      {
+        $project: {
+          year: { $year: "$publishedAt" },
+          month: { $month: "$publishedAt" }
+        }
+      },
+      {
+        $group: {
+          _id: { year: "$year", month: "$month" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
+    ]);
+
+    // Fill in missing months with 0 count (for months with no articles)
+    const currentYear = new Date().getFullYear();
+    const monthlyData = [];
+    for (let month = 1; month <= 12; month++) {
+      const monthData = articlesByMonth.find(item => item._id.month === month);
+      monthlyData.push({
+        month,
+        count: monthData ? monthData.count : 0
+      });
+    }
+
+    // Return the overview data along with the monthly articles data
+    res.json({
+      username: user.username,
+      displayname: user.displayname,
+      profilePicture: user.profilePicture,
+      badge: user.badge,
+      totalArticles,
+      totalLikes: totalLikes[0]?.totalLikes || 0,
+      totalViews: totalViews[0]?.totalViews || 0,
+      mostPopularArticle,
+      totalComments: totalComments[0]?.totalComments || 0,
+      totalSubscribers: user.subscribers.length,
+      totalSubscriptions: user.subscriptions.length,
+      articlesByMonth: monthlyData
+    });
+  } catch (error) {
+    console.error("Error fetching overview data:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // Modified profile update route to handle both regular and Google users
 router.post('/api/userprofile/changeinformation', checkSchema(updateUserValidationSchema), async (request, response) => {
   if (request.user) {
