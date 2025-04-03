@@ -167,7 +167,6 @@ router.get("/api/userprofile",
     async (req, res) => {
         try {
             const { username } = req.query;
-            
             // First try to find in regular users
             let user = await User.findOne({ username }).select(
                 "-password -resetOtp -resetOtpExpires -__v -role -isActive -updatedAt"

@@ -11,14 +11,25 @@ const router = Router();
 //Fetch latest news (sorted by publishedAt)
 router.get('/api/news/latest', async (req, res) => {
   try {
-    const latestNews = await Article.find({ deleted: { $ne: true } }) 
-      .populate('authorId', 'username displayname profilePicture')
+    const latestNews = await Article.find({ deleted: { $ne: true } })
+      .populate('authorId', 'username displayname profilePicture') 
+      .populate('authorIdGoogle', 'username displayname profilePicture') 
       .sort({ publishedAt: -1 })
       .limit(10);
     if (latestNews.length === 0) {
       return res.status(404).json({ message: 'No latest news available.' });
     }
     
+    // Clean up the populated data:
+    // Remove the unpopulated field from each article
+    latestNews.forEach((article) => {
+      if (article.authorIdGoogle) {
+        article.authorId = null; 
+      } else if (article.authorId) {
+        article.authorIdGoogle = null;
+      }
+    });
+
     // Update ratings for all articles
     await Promise.all(latestNews.map(async (article) => {
       // Only update if rating is old or missing
@@ -27,14 +38,13 @@ router.get('/api/news/latest', async (req, res) => {
         await calculateAndUpdateRating(article);
       }
     }));
-    
-    // Return the articles with populated user info
     res.json(latestNews);
   } catch (err) {
     console.error('Error fetching latest news:', err);
     res.status(500).json({ error: 'Error fetching latest news.' });
   }
 });
+
 
 // Fetch articles by category
 router.get('/api/news/category/:category', async (req, res) => {
@@ -45,11 +55,22 @@ router.get('/api/news/category/:category', async (req, res) => {
       deleted: { $ne: true } 
     })
     .populate('authorId', 'username displayname profilePicture')
+    .populate('authorIdGoogle', 'username displayname profilePicture')
     .sort({ publishedAt: -1 });
 
     if (articles.length === 0) {
       return res.status(404).json({ message: `No articles found for category: ${category}` });
     }
+
+    // Clean up the populated data:
+    // Remove the unpopulated field from each article
+    articles.forEach((article) => {
+      if (article.authorIdGoogle) {
+        article.authorId = null; 
+      } else if (article.authorId) {
+        article.authorIdGoogle = null;
+      }
+    });
 
     // Update ratings for all articles
     await Promise.all(articles.map(async (article) => {
@@ -106,6 +127,7 @@ router.get('/api/articles/:username', async (req, res) => {
       deleted: { $ne: true }
     })
     .populate('authorId', 'username displayname profilePicture')
+    .populate('authorIdGoogle', 'username displayname profilePicture')
     .sort({ publishedAt: -1 });
 
     console.log("Articles found:", articles.length);
@@ -113,6 +135,16 @@ router.get('/api/articles/:username', async (req, res) => {
     if (articles.length === 0) {
       return res.status(404).json({ message: `No articles found for username: ${username}` });
     }
+
+    // Clean up the populated data:
+    // Remove the unpopulated field from each article
+    articles.forEach((article) => {
+      if (article.authorIdGoogle) {
+        article.authorId = null; 
+      } else if (article.authorId) {
+        article.authorIdGoogle = null;
+      }
+    });
 
     // Update ratings for all articles
     await Promise.all(articles.map(async (article) => {
@@ -145,6 +177,7 @@ router.get('/api/articles/upvoted/:username', async (req, res) => {
       deleted: { $ne: true }
     })
     .populate('authorId', 'username displayname profilePicture')
+    .populate('authorIdGoogle', 'username displayname profilePicture')
     .sort({ publishedAt: -1 });
 
     console.log("Articles found:", articles.length);
@@ -152,6 +185,16 @@ router.get('/api/articles/upvoted/:username', async (req, res) => {
     if (articles.length === 0) {
       return res.status(404).json({ message: `No articles found for username: ${username}` });
     }
+
+    // Clean up the populated data:
+    // Remove the unpopulated field from each article
+    articles.forEach((article) => {
+      if (article.authorIdGoogle) {
+        article.authorId = null; 
+      } else if (article.authorId) {
+        article.authorIdGoogle = null;
+      }
+    });
 
     //Filter articles needing a rating update before executing DB updates
     const articlesNeedingUpdate = articles.filter(article => 
@@ -197,9 +240,20 @@ router.get('/api/news/search/:query', async (req, res) => {
       ]
     })
     .populate('authorId', 'username displayname profilePicture')
+    .populate('authorIdGoogle', 'username displayname profilePicture')
     .sort({ publishedAt: -1 });
 
     console.log(`Found ${articles.length} articles for query "${query}"`);
+
+    // Clean up the populated data:
+    // Remove the unpopulated field from each article
+    articles.forEach((article) => {
+      if (article.authorIdGoogle) {
+        article.authorId = null; 
+      } else if (article.authorId) {
+        article.authorIdGoogle = null;
+      }
+    });
 
     // Update ratings for all articles
     await Promise.all(articles.map(async (article) => {
@@ -227,11 +281,22 @@ router.get('/api/news/trending', async (req, res) => {
     })
     .sort({ views: -1 })       
     .limit(15)
-    .populate('authorId', 'username displayname profilePicture');
+    .populate('authorId', 'username displayname profilePicture')
+    .populate('authorIdGoogle', 'username displayname profilePicture');
 
     if (!trendingArticles.length) {
       return res.status(404).json({ message: "No trending articles found." });
     }
+
+    // Clean up the populated data:
+    // Remove the unpopulated field from each article
+    trendingArticles.forEach((article) => {
+      if (article.authorIdGoogle) {
+        article.authorId = null; 
+      } else if (article.authorId) {
+        article.authorIdGoogle = null;
+      }
+    });
 
     // Update ratings for all trending articles
     // Always update ratings for trending articles since they're important
@@ -257,10 +322,19 @@ router.get('/api/news/:articleId', async (req, res) => {
       { $inc: { views: 1 } },                     // Increment views
       { new: true }                               // Return the updated document
     )
-    .populate('authorId', 'username displayname profilePicture');
+    .populate('authorId', 'username displayname profilePicture')
+    .populate('authorIdGoogle', 'username displayname profilePicture');
 
     if (!article) {
       return res.status(404).json({ message: 'Article not found or has been deleted.' });
+    }
+    
+    // Clean up the populated data:
+    // Remove the unpopulated field from each article
+    if (article.authorIdGoogle) {
+      article.authorId = null; 
+    } else if (article.authorId) {
+      article.authorIdGoogle = null;
     }
     
     // Always update rating when viewing a single article
@@ -312,7 +386,18 @@ router.get('/api/post/subscribed', requireAuth, async (req, res) => {
       deleted: { $ne: true }
     })
     .populate('authorId', 'username displayname profilePicture')
+    .populate('authorIdGoogle', 'username displayname profilePicture')
     .sort({ publishedAt: -1 });    
+
+    // Clean up the populated data:
+    // Remove the unpopulated field from each article
+    articles.forEach((article) => {
+      if (article.authorIdGoogle) {
+        article.authorId = null; 
+      } else if (article.authorId) {
+        article.authorIdGoogle = null;
+      }
+    });
 
     // Update ratings for all articles
     await Promise.all(articles.map(async (article) => {
@@ -354,14 +439,12 @@ router.delete('/api/news/:articleId', requireAuth, async (req, res)=>{
 
 
 router.post('/api/news/newpost', requireAuth, checkSchema(createArticleValidationSchema), async (request, response) => {
-
   const result = validationResult(request);
   if (!result.isEmpty()) {
     return response.status(400).json({ errors: result.array() });
   }
 
   try {
-    
     const validatedData = matchedData(request);
     console.log("Validated data:", validatedData);
     
@@ -371,16 +454,17 @@ router.post('/api/news/newpost', requireAuth, checkSchema(createArticleValidatio
     // Create article data object with validated data
     const articleData = {
       ...validatedData,
-      authorId: request.user._id,
-      authorusername: request.user.username,
       status: validatedData.status || "on-going",
-      rating: 0, // Initialize rating to 0
-      lastRatingUpdate: new Date()
+      rating: 0, 
+      lastRatingUpdate: new Date(),
+      authorusername: request.user.username, 
+      sources: validatedData.sources || [],
     };
 
-    // Ensure sources is an array
-    if (!articleData.sources) {
-      articleData.sources = [];
+    if (request.user.isGoogleUser) {
+      articleData.authorIdGoogle = request.user._id;
+    } else {
+      articleData.authorId = request.user._id;
     }
 
     console.log("Processed article data:", articleData);
@@ -847,6 +931,7 @@ router.get('/api/news/saved/list', requireAuth, async (req, res) => {
       deleted: { $ne: true }
     })
     .populate('authorId', 'username displayname profilePicture')
+    .populate('authorIdGoogle', 'username displayname profilePicture')
     .sort({ publishedAt: -1 });
     
     if (savedArticles.length === 0) {
@@ -855,6 +940,16 @@ router.get('/api/news/saved/list', requireAuth, async (req, res) => {
         message: 'No saved articles found.' 
       });
     }
+    
+    // Clean up the populated data:
+    // Remove the unpopulated field from each article
+    savedArticles.forEach((article) => {
+      if (article.authorIdGoogle) {
+        article.authorId = null; 
+      } else if (article.authorId) {
+        article.authorIdGoogle = null;
+      }
+    });
     
     await Promise.all(savedArticles.map(async (article) => {
       // Only update if rating is old or missing
@@ -885,3 +980,4 @@ router.get('/api/news/saved/list', requireAuth, async (req, res) => {
 });
 
 export default router;
+
