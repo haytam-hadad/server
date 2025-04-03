@@ -60,7 +60,7 @@ app.use(passport.session());
 app.use(routes);
 
 //admin auth:
-app.post("/api/auth/admin",passport.authenticate("local"),(request,response)=>{
+app.post("/api/admin/auth",passport.authenticate("local"),(request,response)=>{
     return response.status(200).send(request.user);
 });
 
@@ -100,6 +100,13 @@ app.get('/api/auth/status',(request,response)=>{
     return request.user ? response.send(request.user) : response.sendStatus(401);
 });
 
+app.get('/api/admin/auth/status',(request,response)=>{
+  console.log("inside the /admin/auth/status endpoint ");
+  console.log(request.user);
+  console.log(request.session);
+  return request.user ? response.send(request.user) : response.sendStatus(401);
+});
+
 app.post('/api/auth/logout', (req, res) => {
   if (!req.user) return res.sendStatus(401);
 
@@ -115,6 +122,20 @@ app.post('/api/auth/logout', (req, res) => {
   });
 });
 
+app.post('/api/admin/auth/logout', (req, res) => {
+  if (!req.user) return res.sendStatus(401);
+
+  req.logout((err) => {
+      if (err) return res.sendStatus(500);
+
+      req.session.destroy((err) => { 
+          if (err) return res.status(500).json({ message: "Failed to log out" });
+
+          res.clearCookie("connect.sid", { path: "/" }); // Ensure cookie is removed
+          res.status(200).json({ message: "Logged out successfully" });
+      });
+  });
+});
 
 
 app.post('/api/forgotpwd', async (req, res) => {
