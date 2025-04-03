@@ -200,39 +200,45 @@ router.get("/api/userprofile",
 router.get("/api/userprofile/overview", requireAuth, async (req, res) => {
   try {
     const userId = req.user._id;
+    const isGoogleUser = req.user.isGoogleUser;
+    const currentUserModel = isGoogleUser ? 'Googleuser' : 'User';
 
     // Fetch the user details excluding sensitive information
-    let user = await User.findById(userId).select(
-      "-password -resetOtp -resetOtpExpires -__v -role -isActive -updatedAt -bio -email"
-    );
+    const userFields = "-password -__v -role -isActive -updatedAt -bio -email";
+    const user = isGoogleUser 
+      ? await Googleuser.findById(userId).select(userFields)
+      : await User.findById(userId).select(userFields);
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Create the appropriate query condition based on user type
+    const authorQuery = isGoogleUser 
+      ? { authorIdGoogle: userId, deleted: false }
+      : { authorId: userId, deleted: false };
 
     // Count the total articles authored by the user
-    const totalArticles = await Article.countDocuments({ authorId: userId, deleted: false });
+    const totalArticles = await Article.countDocuments(authorQuery);
 
     // Aggregate total likes (upvotes) for the user's articles
     const totalLikes = await Article.aggregate([
-      { $match: { authorId: userId, deleted: false } },
+      { $match: authorQuery },
       { $group: { _id: null, totalLikes: { $sum: "$upvote" } } },
     ]);
 
     // Aggregate total views for the user's articles
     const totalViews = await Article.aggregate([
-      { $match: { authorId: userId, deleted: false } },
+      { $match: authorQuery },
       { $group: { _id: null, totalViews: { $sum: "$views" } } },
     ]);
 
     // Find the most popular (most viewed) article
-    const mostPopularArticle = await Article.findOne({ authorId: userId, status: "approved", deleted: false })
+    const mostPopularArticle = await Article.findOne({ ...authorQuery, status: "approved" })
       .sort({ views: -1 })
       .select("title views");
 
     // Count the total comments made by the user
     const totalComments = await Article.aggregate([
-      { $match: { authorId: userId, deleted: false } },
+      { $match: authorQuery },
       { $unwind: "$comments" },
       { $match: { "comments.author": userId } },
       { $count: "totalComments" }
@@ -240,7 +246,12 @@ router.get("/api/userprofile/overview", requireAuth, async (req, res) => {
 
     // Aggregate the number of articles published by month for the past year
     const articlesByMonth = await Article.aggregate([
-      { $match: { authorId: userId, deleted: false, publishedAt: { $gte: new Date(new Date().setFullYear(new Date().getFullYear() - 1)) } } },
+      { 
+        $match: { 
+          ...authorQuery, 
+          publishedAt: { $gte: new Date(new Date().setFullYear(new Date().getFullYear() - 1)) } 
+        } 
+      },
       {
         $project: {
           year: { $year: "$publishedAt" },
@@ -278,8 +289,8 @@ router.get("/api/userprofile/overview", requireAuth, async (req, res) => {
       totalViews: totalViews[0]?.totalViews || 0,
       mostPopularArticle,
       totalComments: totalComments[0]?.totalComments || 0,
-      totalSubscribers: user.subscribers.length,
-      totalSubscriptions: user.subscriptions.length,
+      totalSubscribers: user.subscribers?.length || 0,
+      totalSubscriptions: user.subscriptions?.length || 0,
       articlesByMonth: monthlyData
     });
   } catch (error) {
