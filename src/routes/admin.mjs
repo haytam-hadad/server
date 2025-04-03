@@ -7,6 +7,63 @@ import { requireAuth , requireAdmin } from "../middleware/auth.mjs";
 
 const router = Router();
 
+// ==================== OVERVIEW =============================
+
+router.get("/api/admin/overview", async (req, res) => {
+  try {
+    // Fetch general statistics in parallel
+    const [totalArticles, totalUsersRegular, totalUsersGoogle, totalViews, totalComments, totalLikes, totalDislikes, articlesByMonth] = await Promise.all([
+      Article.countDocuments({ deleted: false }), // Total articles
+      mongoose.model('User').countDocuments(), // Total regular users
+      mongoose.model('Googleuser').countDocuments(), // Total Google users
+      Article.aggregate([{ $group: { _id: null, totalViews: { $sum: "$views" } } }]), // Total views
+      Article.aggregate([{ $unwind: "$comments" }, { $count: "totalComments" }]), // Total comments
+      Article.aggregate([{ $group: { _id: null, totalLikes: { $sum: "$upvote" } } }]), // Total likes
+      Article.aggregate([{ $group: { _id: null, totalDislikes: { $sum: "$downvote" } } }]), // Total dislikes
+      Article.aggregate([
+        { 
+          $match: { 
+            deleted: false, 
+            publishedAt: { $gte: new Date(new Date().setFullYear(new Date().getFullYear() - 1)) } 
+          } 
+        },
+        { $project: { year: { $year: "$publishedAt" }, month: { $month: "$publishedAt" } } },
+        { $group: { _id: { year: "$year", month: "$month" }, count: { $sum: 1 } } },
+        { $sort: { "_id.year": 1, "_id.month": 1 } }
+      ])
+    ]);
+
+    // Correctly sum regular and Google users
+    const totalUsers = totalUsersRegular + totalUsersGoogle;
+
+    // Fill missing months (if no articles were posted in some months)
+    const currentYear = new Date().getFullYear();
+    const monthlyData = [];
+    for (let month = 1; month <= 12; month++) {
+      const monthData = articlesByMonth.find(item => item._id.month === month);
+      monthlyData.push({
+        month,
+        count: monthData ? monthData.count : 0
+      });
+    }
+
+    // Send the response
+    res.json({
+      totalArticles,
+      totalUsers,
+      totalViews: totalViews[0]?.totalViews || 0,
+      totalComments: totalComments[0]?.totalComments || 0,
+      totalLikes: totalLikes[0]?.totalLikes || 0,
+      totalDislikes: totalDislikes[0]?.totalDislikes || 0,
+      articlesByMonth: monthlyData
+    });
+  } catch (error) {
+    console.error("Error fetching site overview data:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 // ==================== ARTICLE MANAGEMENT ====================
 
 // Get all articles (admin only)
@@ -146,8 +203,6 @@ router.patch('/api/admin/articles/:articleId/reject', requireAuth, requireAdmin,
 
     // Update article status
     article.status = 'rejected';
-    // If we want to store rejection reason, we'd need to add this field to the schema
-    // article.rejectionReason = reason;
     await article.save();
 
     return res.status(200).json({
@@ -345,14 +400,25 @@ router.get('/api/admin/articles/stats', requireAuth, requireAdmin, async (req, r
 
 // ==================== CATEGORY MANAGEMENT ====================
 
-// Get all categories (admin only)
-router.get('/api/admin/categories', requireAuth, requireAdmin, async (req, res) => {
+router.get('/api/admin/news/categories', async (req, res) => {
   try {
-    const categories = await Category.find().sort({ order: 1, name: 1 });
-    return res.status(200).json({ categories });
-  } catch (error) {
-    console.error('Error fetching categories:', error);
-    return res.status(500).json({ error: 'Something went wrong.' });
+    
+    const topCategories = await Article.aggregate([
+      { $match: { deleted: { $ne: true } } }, // Ignore deleted articles
+      { $group: { 
+          _id: "$category", 
+          totalArticles: { $sum: 1 } // Count how many articles belong to each category
+      }},
+      { $sort: { totalArticles: -1 } }
+    ]);    
+
+    if (topCategories.length === 0) {
+      return res.status(404).json({ message: ` No categories found `});
+    }
+    res.json(topCategories);
+  } catch (err) {
+    console.error('Error fetching Top categories:', err);
+    res.status(500).json({ error: 'Error fetching Top categories.' });
   }
 });
 
@@ -363,7 +429,6 @@ router.get('/api/admin/reports/all', requireAuth, requireAdmin, async (req, res)
   try {
     const reports = await Report.find()
       .populate('reportedBy', 'username displayname profilePicture')
-      .populate('reviewedBy', 'username displayname')
       .populate({
         path: 'articleId',
         select: 'title authorusername'
@@ -394,7 +459,6 @@ router.get('/api/admin/reports/search', requireAuth, requireAdmin, async (req, r
 
     const reports = await Report.find(query)
       .populate('reportedBy', 'username displayname profilePicture')
-      .populate('reviewedBy', 'username displayname')
       .populate({
         path: 'articleId',
         select: 'title authorusername'
@@ -419,7 +483,6 @@ router.get('/api/admin/reports/article/:articleId', requireAuth, requireAdmin, a
 
     const reports = await Report.find({ articleId })
       .populate('reportedBy', 'username displayname profilePicture')
-      .populate('reviewedBy', 'username displayname')
       .sort({ createdAt: -1 });
 
     return res.status(200).json({ reports });
@@ -440,7 +503,6 @@ router.get('/api/admin/reports/status/:status', requireAuth, requireAdmin, async
 
     const reports = await Report.find({ status })
       .populate('reportedBy', 'username displayname profilePicture')
-      .populate('reviewedBy', 'username displayname')
       .populate({
         path: 'articleId',
         select: 'title authorusername'
@@ -609,20 +671,75 @@ router.get('/api/admin/reports/stats', requireAuth, requireAdmin, async (req, re
 router.get('/api/admin/articles/:articleId/comments', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { articleId } = req.params;
-    
+
     if (!mongoose.Types.ObjectId.isValid(articleId)) {
       return res.status(400).json({ message: 'Invalid article ID format.' });
     }
 
-    const article = await Article.findById(articleId);
-    
+    const article = await Article.findById(articleId).select('comments');
+
     if (!article) {
       return res.status(404).json({ message: 'Article not found.' });
     }
 
+    const sortedComments = article.comments.sort((a, b) => b.createdAt - a.createdAt);
+  
+    const authorIds = [...new Set(sortedComments.map(comment => comment.author.toString()))];
+    
+    // Fetch all regular users in one query
+    const regularUsers = await mongoose.model('User').find({
+      _id: { $in: authorIds }
+    }).select('_id username displayname profilePicture').lean();
+    
+    // Fetch all Google users in one query
+    const googleUsers = await mongoose.model('Googleuser').find({
+      _id: { $in: authorIds }
+    }).select('_id username displayname profilePicture').lean();
+    
+    // Create a map for quick lookup
+    const userMap = {};
+    
+    // Add regular users to the map
+    regularUsers.forEach(user => {
+      userMap[user._id.toString()] = {
+        _id: user._id,
+        username: user.username,
+        displayname: user.displayname || user.username,
+        profilePicture: user.profilePicture || "" // Regular user profile picture
+      };
+    });
+    
+    // Add Google users to the map
+    googleUsers.forEach(user => {
+      userMap[user._id.toString()] = {
+        _id: user._id,
+        username: user.username,
+        displayname: user.displayname || user.username,
+        profilePicture: user.profilePicture || "" 
+      };
+    });
+    
+    // Populate comments with author information from the map
+    const populatedComments = sortedComments.map(comment => {
+      const authorId = comment.author.toString();
+      const author = userMap[authorId] || {
+        _id: comment.author,
+        username: 'Unknown User',
+        displayname: 'Unknown User',
+        profilePicture: ""
+      };
+      
+      return {
+        _id: comment._id,
+        text: comment.text,
+        createdAt: comment.createdAt,
+        updatedAt: comment.updatedAt,
+        author
+      };
+    });
+
     return res.status(200).json({
-      articleTitle: article.title,
-      comments: article.comments || []
+      comments: populatedComments
     });
   } catch (error) {
     console.error('Error fetching comments:', error);
