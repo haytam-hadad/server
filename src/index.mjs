@@ -59,7 +59,12 @@ app.use(passport.session());
 
 app.use(routes);
 
+//admin auth:
+app.post("/api/auth/admin",passport.authenticate("local"),(request,response)=>{
+    return response.status(200).send(request.user);
+});
 
+//normal auth:
 app.post("/api/auth",passport.authenticate("local"),(request,response)=>{
     return response.status(200).send(request.user);
 });
