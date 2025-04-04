@@ -7,7 +7,7 @@ passport.serializeUser((user, done) => {
 });
 
 passport.deserializeUser(async (obj, done) => {
-    console.log("Inside deserializeUser, received:", obj);
+    console.log("Inside user deserializeUser, received:", obj);
     try {
         let findUser;
         if (obj.type === "google") {

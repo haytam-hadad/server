@@ -11,19 +11,19 @@ import dotenv from 'dotenv';
 import nodemailer from "nodemailer";
 import { User } from "./mongoose/schemas/user.mjs";
 import { Googleuser } from "./mongoose/schemas/googleuser.mjs";
-import "./strategies/passport-config.mjs";
+import userPassport from './strategies/passport-config.mjs';
+import adminPassport from './strategies/passport-admin.mjs';
 import cors from "cors";
 import "./strategies/googleAuth.mjs";
 
-
 dotenv.config();
 const app = express();
+
+// Update CORS to support both user and admin sites
 app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:3000",
-  credentials: true,
+  origin: true, // This allows all origins in development
+  credentials: true
 }));
-
-
 
 const mongoUrl = process.env.ATLAS_URI;
 const secretpwd = process.env.SESSION_SECRET;
@@ -35,56 +35,70 @@ mongoose.connect(mongoUrl, {
     .then(() => console.log("Connected to MongoDB Atlas"))
     .catch((err) => console.log("Failed to connect:", err));
 
+// Create separate session configurations with different store collections
+const userSession = session({
+  name: 'user.sid',
+  secret: secretpwd,
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 86400000, httpOnly: true, secure: false, sameSite: 'lax' },
+  store: MongoStore.create({ 
+    client: mongoose.connection.getClient(),
+    collectionName: 'userSessions'  // Store user sessions in a separate collection
+  })
+});
+
+const adminSession = session({
+  name: 'admin.sid',
+  secret: secretpwd,
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 86400000, httpOnly: true, secure: false, sameSite: 'lax' },
+  store: MongoStore.create({ 
+    client: mongoose.connection.getClient(),
+    collectionName: 'adminSessions'  // Store admin sessions in a separate collection
+  })
+});
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(session({
-  secret: secretpwd,
-  saveUninitialized: false,
-  resave: false,
-  cookie: {
-      maxAge: 1000 * 60 * 60 * 24, // 1 day
-      httpOnly: true, 
-      secure: false,  // ✅ Secure cookies in production
-      sameSite: "lax"
-  },
-  store: MongoStore.create({
-      client: mongoose.connection.getClient(),
-  }),        
-}));
 
-
-app.use(passport.initialize());
-app.use(passport.session());
+// Apply the appropriate session middleware based on the route
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api/admin")) {
+    adminSession(req, res, () => {
+      adminPassport.initialize()(req, res, () => {
+        adminPassport.session()(req, res, next);
+      });
+    });
+  } else {
+    userSession(req, res, () => {
+      userPassport.initialize()(req, res, () => {
+        userPassport.session()(req, res, next);
+      });
+    });
+  }
+});
 
 app.use(routes);
 
-//admin auth:
-app.post("/api/admin/auth",passport.authenticate("local"),(request,response)=>{
-    return response.status(200).send(request.user);
+// Authentication routes
+app.post("/api/auth", userPassport.authenticate("user-local"), (req, res) => {
+  return res.status(200).send(req.user);
 });
 
-//normal auth:
-app.post("/api/auth",passport.authenticate("local"),(request,response)=>{
-    return response.status(200).send(request.user);
+app.post("/api/admin/auth", adminPassport.authenticate("admin-local"), (req, res) => {
+  return res.status(200).send(req.user);
 });
 
-//starting the server :
-
+// Starting the server
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
 
-// "/api" : means the base route
-
-app.get('/', (request, response) => {
-  request.session.visited = true;
-  console.log(request.session.id);
-  console.log(request.user);
-});
-
+// Auth status endpoints
 app.get("/api/auth/user", (req, res) => {
   if (req.isAuthenticated()) {
     res.json({ user: req.user });
@@ -110,34 +124,34 @@ app.get('/api/admin/auth/status',(request,response)=>{
 app.post('/api/auth/logout', (req, res) => {
   if (!req.user) return res.sendStatus(401);
 
-  req.logout((err) => {
-      if (err) return res.sendStatus(500);
+  req.logout(err => {
+    if (err) return res.sendStatus(500);
 
-      req.session.destroy((err) => { 
-          if (err) return res.status(500).json({ message: "Failed to log out" });
+    req.session.destroy(err => {
+      if (err) return res.status(500).json({ message: "Failed to log out" });
 
-          res.clearCookie("connect.sid", { path: "/" }); // Ensure cookie is removed
-          res.status(200).json({ message: "Logged out successfully" });
-      });
+      res.clearCookie("user.sid", { path: "/" });
+      res.status(200).json({ message: "User logged out successfully" });
+    });
   });
 });
 
 app.post('/api/admin/auth/logout', (req, res) => {
   if (!req.user) return res.sendStatus(401);
 
-  req.logout((err) => {
-      if (err) return res.sendStatus(500);
+  req.logout(err => {
+    if (err) return res.sendStatus(500);
 
-      req.session.destroy((err) => { 
-          if (err) return res.status(500).json({ message: "Failed to log out" });
+    req.session.destroy(err => {
+      if (err) return res.status(500).json({ message: "Failed to log out" });
 
-          res.clearCookie("connect.sid", { path: "/" }); // Ensure cookie is removed
-          res.status(200).json({ message: "Logged out successfully" });
-      });
+      res.clearCookie("admin.sid", { path: "/" });
+      res.status(200).json({ message: "Admin logged out successfully" });
+    });
   });
 });
 
-
+// Password reset routes (unchanged)
 app.post('/api/forgotpwd', async (req, res) => {
   const { email } = req.body;
   
@@ -200,7 +214,7 @@ app.post('/api/forgotpwd', async (req, res) => {
             This OTP will expire in <b>10 minutes</b>.
           </p>
           <p style="font-size: 12px; color: #999;">
-            If you didn’t request this, please ignore this email.
+            If you didn't request this, please ignore this email.
           </p>
         </div>
       `
@@ -214,7 +228,6 @@ app.post('/api/forgotpwd', async (req, res) => {
   }
 });
 
-// Example: POST /api/reset-password
 app.post('/api/resetpwd', async (req, res) => {
     const { email, otp, newPassword } = req.body;
   
@@ -248,12 +261,12 @@ app.post('/api/resetpwd', async (req, res) => {
 });
 
 app.get("/api/auth/google",
-  passport.authenticate("google", { scope: ["profile", "email"] }),(request,response)=>{
+  userPassport.authenticate("google", { scope: ["profile", "email"] }),(request,response)=>{
   return response.status(200).send(request.user);
 });
 
 app.get('/api/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: process.env.CLIENT_URL || 'http://localhost:3000/login' }),
+  userPassport.authenticate('google', { failureRedirect: process.env.CLIENT_URL || 'http://localhost:3000/login' }),
   (req, res) => {
     if (!req.user) {
       res.redirect('http://localhost:3000/login');
@@ -262,4 +275,4 @@ app.get('/api/auth/google/callback',
     res.redirect('http://localhost:3000/');
   }
 );
-  
+
