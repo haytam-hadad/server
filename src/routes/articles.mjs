@@ -8,10 +8,13 @@ import { calculateAndUpdateRating } from "../utils/helpers.mjs";
 
 const router = Router();
 
-//Fetch latest news (sorted by publishedAt)
+//Fetch latest news (sorted by publishedAt) - MODIFIED to only show approved articles
 router.get('/api/news/latest', async (req, res) => {
   try {
-    const latestNews = await Article.find({ deleted: { $ne: true } })
+    const latestNews = await Article.find({ 
+      deleted: { $ne: true },
+      status: 'approved' // Only show approved articles
+    })
       .populate('authorId', 'username displayname profilePicture') 
       .populate('authorIdGoogle', 'username displayname profilePicture') 
       .sort({ publishedAt: -1 })
@@ -45,14 +48,49 @@ router.get('/api/news/latest', async (req, res) => {
   }
 });
 
+// This route specifically needs to show ongoing articles, so we keep it as is
+router.get('/api/articles/ongoing', requireAuth, async (req, res) => {
+  try {
+    // Get the authenticated user's ID from the session
+    const userId = req.user._id;
+    const isGoogleUser = req.user.isGoogleUser;
+    // Find all articles where the author is the current user and status is "ongoing"
+    let ongoingArticles;
+    if(isGoogleUser){
+      ongoingArticles = await Article.find({
+        authorIdGoogle: userId,
+        status: 'on-going' 
+      }).sort({ updatedAt: -1 }); 
+    }else{
+      ongoingArticles = await Article.find({
+        authorId: userId,
+        status: 'on-going' 
+      }).sort({ updatedAt: -1 }); 
+    }
+    
+    return res.status(200).json({
+      success: true,
+      count: ongoingArticles.length,
+      data: ongoingArticles
+    });
+  } catch (error) {
+    console.error('Error fetching ongoing articles:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while fetching ongoing articles',
+      error: error.message
+    });
+  }
+});
 
-// Fetch articles by category
+// Fetch articles by category - MODIFIED to only show approved articles
 router.get('/api/news/category/:category', async (req, res) => {
   try {
     const { category } = req.params;
     const articles = await Article.find({
       category,
-      deleted: { $ne: true } 
+      deleted: { $ne: true },
+      status: 'approved' // Only show approved articles
     })
     .populate('authorId', 'username displayname profilePicture')
     .populate('authorIdGoogle', 'username displayname profilePicture')
@@ -89,12 +127,16 @@ router.get('/api/news/category/:category', async (req, res) => {
   }
 });
 
-//get top categories
+//get top categories - MODIFIED to only consider approved articles
 router.get('/api/news/topcategories/', async (req, res) => {
   try {
     
     const topCategories = await Article.aggregate([
-      { $match: { deleted: { $ne: true } } }, // Ignore deleted articles
+      { $match: { 
+          deleted: { $ne: true },
+          status: 'approved' // Only consider approved articles
+        } 
+      },
       { $group: { 
           _id: "$category", 
           totalArticles: { $sum: 1 } // Count how many articles belong to each category
@@ -113,6 +155,7 @@ router.get('/api/news/topcategories/', async (req, res) => {
   }
 });
 
+// Get articles by username - MODIFIED to only show approved articles
 router.get('/api/articles/:username', async (req, res) => {
   try {
     const { username } = req.params;
@@ -124,7 +167,8 @@ router.get('/api/articles/:username', async (req, res) => {
 
     const articles = await Article.find({ 
       authorusername: { $regex: new RegExp(`^${username}$`, 'i') }, 
-      deleted: { $ne: true }
+      deleted: { $ne: true },
+      status: 'approved' // Only show approved articles
     })
     .populate('authorId', 'username displayname profilePicture')
     .populate('authorIdGoogle', 'username displayname profilePicture')
@@ -163,6 +207,7 @@ router.get('/api/articles/:username', async (req, res) => {
   }
 });
 
+// Get upvoted articles - MODIFIED to only show approved articles
 router.get('/api/articles/upvoted/:username', async (req, res) => {
   try {
     const { username } = req.params;
@@ -174,7 +219,8 @@ router.get('/api/articles/upvoted/:username', async (req, res) => {
 
     const articles = await Article.find({ 
       userUpvote: username,
-      deleted: { $ne: true }
+      deleted: { $ne: true },
+      status: 'approved' // Only show approved articles
     })
     .populate('authorId', 'username displayname profilePicture')
     .populate('authorIdGoogle', 'username displayname profilePicture')
@@ -214,7 +260,7 @@ router.get('/api/articles/upvoted/:username', async (req, res) => {
   }
 });
 
-// 🔍 Search articles by title, author, or content
+// Search articles - MODIFIED to only show approved articles
 router.get('/api/news/search/:query', async (req, res) => {
   try {
     const { query } = req.params;
@@ -227,7 +273,10 @@ router.get('/api/news/search/:query', async (req, res) => {
     // Update the search fields to match your schema
     const articles = await Article.find({
       $and: [
-        { deleted: { $ne: true } }, // Ensures deleted articles are excluded
+        { 
+          deleted: { $ne: true },
+          status: 'approved' // Only show approved articles
+        },
         {
           $or: [
             { title: { $regex: query, $options: 'i' } },
@@ -272,6 +321,7 @@ router.get('/api/news/search/:query', async (req, res) => {
   }
 });
 
+// Trending articles - Already has status: 'approved' filter, so no change needed
 router.get('/api/news/trending', async (req, res) => {
   try {
     const trendingArticles = await Article.find({
@@ -310,6 +360,7 @@ router.get('/api/news/trending', async (req, res) => {
   }
 });
 
+// Get article by ID - MODIFIED to only show approved articles
 router.get('/api/news/:articleId', async (req, res) => {
   try {
     const { articleId } = req.params;
@@ -318,7 +369,11 @@ router.get('/api/news/:articleId', async (req, res) => {
     }
     
     const article = await Article.findOneAndUpdate(
-      { _id: articleId, deleted: { $ne: true } }, // Correct condition to exclude deleted articles
+      { 
+        _id: articleId, 
+        deleted: { $ne: true },
+        status: 'approved' // Only show approved articles
+      },
       { $inc: { views: 1 } },                     // Increment views
       { new: true }                               // Return the updated document
     )
@@ -326,7 +381,7 @@ router.get('/api/news/:articleId', async (req, res) => {
     .populate('authorIdGoogle', 'username displayname profilePicture');
 
     if (!article) {
-      return res.status(404).json({ message: 'Article not found or has been deleted.' });
+      return res.status(404).json({ message: 'Article not found, has been deleted, or is not approved.' });
     }
     
     // Clean up the populated data:
@@ -348,10 +403,15 @@ router.get('/api/news/:articleId', async (req, res) => {
   }
 });
 
+// Get article rating - MODIFIED to only allow for approved articles
 router.get("/api/post/rating/:articleId", async (req, res) => {
   try {
-    const article = await Article.findById(req.params.articleId);
-    if (!article) return res.status(404).json({ message: "Article not found." });
+    const article = await Article.findOne({
+      _id: req.params.articleId,
+      status: 'approved' // Only allow for approved articles
+    });
+    
+    if (!article) return res.status(404).json({ message: "Article not found or not approved." });
 
     // Calculate and update the rating
     const ratingPercentage = await calculateAndUpdateRating(article);
@@ -369,6 +429,7 @@ router.get("/api/post/rating/:articleId", async (req, res) => {
   }
 });
 
+// Get subscribed articles - MODIFIED to only show approved articles
 router.get('/api/post/subscribed', requireAuth, async (req, res) => {
   try {
     // Check if user has subscriptions
@@ -383,7 +444,8 @@ router.get('/api/post/subscribed', requireAuth, async (req, res) => {
     // Use both authorId and authorusername to ensure compatibility
     const articles = await Article.find({
       authorId: { $in: subscribedUserIds },
-      deleted: { $ne: true }
+      deleted: { $ne: true },
+      status: 'approved' // Only show approved articles
     })
     .populate('authorId', 'username displayname profilePicture')
     .populate('authorIdGoogle', 'username displayname profilePicture')
@@ -415,6 +477,7 @@ router.get('/api/post/subscribed', requireAuth, async (req, res) => {
   }
 });
 
+// Delete article - No change needed as this is an action on a specific article
 router.delete('/api/news/:articleId', requireAuth, async (req, res)=>{
   const { articleId } = req.params;
   try {
@@ -437,7 +500,7 @@ router.delete('/api/news/:articleId', requireAuth, async (req, res)=>{
   }
 });
 
-
+// Create new article - No change needed as this creates a new article
 router.post('/api/news/newpost', requireAuth, checkSchema(createArticleValidationSchema), async (request, response) => {
   const result = validationResult(request);
   if (!result.isEmpty()) {
@@ -489,6 +552,7 @@ router.post('/api/news/newpost', requireAuth, checkSchema(createArticleValidatio
   }
 });
 
+// Upvote article - No change needed as this is an action on a specific article
 router.post('/api/news/:articleId/upvote', requireAuth, async (req, res) => {
   try {
     const { articleId } = req.params;
@@ -542,6 +606,7 @@ router.post('/api/news/:articleId/upvote', requireAuth, async (req, res) => {
   }
 });
 
+// Downvote article - No change needed as this is an action on a specific article
 router.post('/api/news/:articleId/downvote', requireAuth, async (req, res) => {
   try {
     const { articleId } = req.params;
@@ -595,7 +660,7 @@ router.post('/api/news/:articleId/downvote', requireAuth, async (req, res) => {
   }
 });
 
-
+// Get like status - No change needed as this is an action on a specific article
 router.get('/api/news/:articleId/like-status', requireAuth, async (req, res) => {
   try {
     const { articleId } = req.params;
@@ -627,6 +692,7 @@ router.get('/api/news/:articleId/like-status', requireAuth, async (req, res) => 
   }
 });
 
+// Add comment - No change needed as this is an action on a specific article
 router.post('/api/news/:articleId/comments', requireAuth, async (req, res) => {
   try {
     const { articleId } = req.params;
@@ -672,6 +738,7 @@ router.post('/api/news/:articleId/comments', requireAuth, async (req, res) => {
   }
 });
 
+// Get comments - No change needed as this is an action on a specific article
 router.get('/api/news/:articleId/comments', async (req, res) => {
   try {
     const { articleId } = req.params;
@@ -751,6 +818,7 @@ router.get('/api/news/:articleId/comments', async (req, res) => {
   }
 });
 
+// Delete comment - No change needed as this is an action on a specific article
 router.delete('/api/news/:articleId/comments/:commentId', requireAuth, async (req, res) => {
   try {
     const { articleId, commentId } = req.params;
@@ -834,7 +902,7 @@ router.delete('/api/news/:articleId/comments/:commentId', requireAuth, async (re
   }
 });
 
-// Save/unsave an article
+// Save/unsave an article - No change needed as this is an action on a specific article
 router.post('/api/news/:articleId/save', requireAuth, async (req, res) => {
   try {
     const { articleId } = req.params;
@@ -896,7 +964,7 @@ router.post('/api/news/:articleId/save', requireAuth, async (req, res) => {
   }
 });
 
-// Get saved status for an article
+// Get saved status for an article - No change needed as this is an action on a specific article
 router.get('/api/news/:articleId/save-status', requireAuth, async (req, res) => {
   try {
     const { articleId } = req.params;
@@ -920,7 +988,7 @@ router.get('/api/news/:articleId/save-status', requireAuth, async (req, res) => 
   }
 });
 
-// Get all saved articles for the current user
+// Get all saved articles for the current user - MODIFIED to only show approved articles
 router.get('/api/news/saved/list', requireAuth, async (req, res) => {
   try {
     const userId = req.user._id;
@@ -928,7 +996,8 @@ router.get('/api/news/saved/list', requireAuth, async (req, res) => {
     // Find all articles saved by this user
     const savedArticles = await Article.find({
       'saved.userId': userId,
-      deleted: { $ne: true }
+      deleted: { $ne: true },
+      status: 'approved' // Only show approved articles
     })
     .populate('authorId', 'username displayname profilePicture')
     .populate('authorIdGoogle', 'username displayname profilePicture')

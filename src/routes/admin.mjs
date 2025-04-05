@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Report } from "../mongoose/schemas/report.mjs";
 import { Article } from "../mongoose/schemas/article.mjs";
 import { User } from "../mongoose/schemas/user.mjs";
+import { Googleuser } from "../mongoose/schemas/googleuser.mjs";
 import mongoose from "mongoose";
 import { requireAuth , requireAdmin } from "../middleware/auth.mjs";
 
@@ -831,7 +832,13 @@ router.get('/api/admin/users/all', requireAuth, requireAdmin, async (req, res) =
       .select('-password -resetOtp -resetOtpExpires')
       .sort({ createdAt: -1 });
 
-    return res.status(200).json({ users });
+    const googleusers = await Googleuser.find()
+      .select('-password -resetOtp -resetOtpExpires')
+      .sort({ createdAt: -1 });
+    return res.status(200).json({ 
+      users,
+      googleusers 
+    });
   } catch (error) {
     console.error('Error fetching users:', error);
     return res.status(500).json({ error: 'Something went wrong.' });

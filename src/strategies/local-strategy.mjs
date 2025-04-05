@@ -10,8 +10,7 @@ passport.use(
   new LocalStrategy({ usernameField: "username", passwordField: "password" }, async (username, password, done) => {
     try {
       const findUser = await User.findOne({
-        $or: [{ username }, { email: username }],
-        role: "user" 
+        $or: [{ username }, { email: username }]
       });
 
       if (!findUser) throw new Error("User not found or not a normal user");
