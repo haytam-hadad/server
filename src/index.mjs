@@ -19,7 +19,7 @@ import "./strategies/googleAuth.mjs";
 dotenv.config();
 const app = express();
 
-// Update CORS to support both user and admin sites
+// Simplified CORS configuration that works for development
 app.use(cors({
   origin: true, // This allows all origins in development
   credentials: true
@@ -35,6 +35,17 @@ mongoose.connect(mongoUrl, {
     .then(() => console.log("Connected to MongoDB Atlas"))
     .catch((err) => console.log("Failed to connect:", err));
 
+// Create MongoDB stores for sessions
+const userSessionStore = MongoStore.create({ 
+  client: mongoose.connection.getClient(),
+  collectionName: 'userSessions'
+});
+
+const adminSessionStore = MongoStore.create({ 
+  client: mongoose.connection.getClient(),
+  collectionName: 'adminSessions'
+});
+
 // Create separate session configurations with different store collections
 const userSession = session({
   name: 'user.sid',
@@ -42,10 +53,7 @@ const userSession = session({
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 86400000, httpOnly: true, secure: false, sameSite: 'lax' },
-  store: MongoStore.create({ 
-    client: mongoose.connection.getClient(),
-    collectionName: 'userSessions'  // Store user sessions in a separate collection
-  })
+  store: userSessionStore
 });
 
 const adminSession = session({
@@ -54,10 +62,7 @@ const adminSession = session({
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 86400000, httpOnly: true, secure: false, sameSite: 'lax' },
-  store: MongoStore.create({ 
-    client: mongoose.connection.getClient(),
-    collectionName: 'adminSessions'  // Store admin sessions in a separate collection
-  })
+  store: adminSessionStore
 });
 
 app.use(express.json());
@@ -121,31 +126,83 @@ app.get('/api/admin/auth/status',(request,response)=>{
   return request.user ? response.send(request.user) : response.sendStatus(401);
 });
 
+// User logout route - completely isolated from admin sessions
 app.post('/api/auth/logout', (req, res) => {
-  if (!req.user) return res.sendStatus(401);
+  console.log("User logout route called");
+  
+  // Check if there's a user session
+  if (!req.user) {
+    console.log("No user authenticated");
+    return res.sendStatus(401);
+  }
 
+  // Log session info for debugging
+  console.log("User session ID:", req.sessionID);
+  
+  // First, log the user out of Passport
   req.logout(err => {
-    if (err) return res.sendStatus(500);
-
+    if (err) {
+      console.error("Error during logout:", err);
+      return res.sendStatus(500);
+    }
+    
+    // Then destroy the session
     req.session.destroy(err => {
-      if (err) return res.status(500).json({ message: "Failed to log out" });
-
-      res.clearCookie("user.sid", { path: "/" });
+      if (err) {
+        console.error("Error destroying session:", err);
+        return res.status(500).json({ message: "Failed to log out" });
+      }
+      
+      // Clear the user cookie
+      res.clearCookie("user.sid", { 
+        path: "/",
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax'
+      });
+      
+      console.log("User logged out successfully");
       res.status(200).json({ message: "User logged out successfully" });
     });
   });
 });
 
+// Admin logout route - completely isolated from user sessions
 app.post('/api/admin/auth/logout', (req, res) => {
-  if (!req.user) return res.sendStatus(401);
+  console.log("Admin logout route called");
+  
+  // Check if there's an admin session
+  if (!req.user) {
+    console.log("No admin authenticated");
+    return res.sendStatus(401);
+  }
 
+  // Log session info for debugging
+  console.log("Admin session ID:", req.sessionID);
+  
+  // First, log the admin out of Passport
   req.logout(err => {
-    if (err) return res.sendStatus(500);
-
+    if (err) {
+      console.error("Error during admin logout:", err);
+      return res.sendStatus(500);
+    }
+    
+    // Then destroy the session
     req.session.destroy(err => {
-      if (err) return res.status(500).json({ message: "Failed to log out" });
-
-      res.clearCookie("admin.sid", { path: "/" });
+      if (err) {
+        console.error("Error destroying admin session:", err);
+        return res.status(500).json({ message: "Failed to log out admin" });
+      }
+      
+      // Clear the admin cookie
+      res.clearCookie("admin.sid", { 
+        path: "/",
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax'
+      });
+      
+      console.log("Admin logged out successfully");
       res.status(200).json({ message: "Admin logged out successfully" });
     });
   });
